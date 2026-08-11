@@ -1,0 +1,65 @@
+{
+  "chatgpt": {
+    "name": "ChatGPT",
+    "hostnames": ["chat.openai.com", "chatgpt.com"],
+    "selectors": ["#prompt-textarea", "div[contenteditable='true'][data-placeholder]", "textarea[data-id]", "div[contenteditable='true'][role='textbox']"],
+    "inputType": "contenteditable",
+    "injectMethod": "react-synthetic",
+    "containerSelector": "main",
+    "icon": "🟢"
+  },
+  "claude": {
+    "name": "Claude",
+    "hostnames": ["claude.ai"],
+    "selectors": ["div.ProseMirror[contenteditable='true']", "fieldset textarea", "div[contenteditable='true'][translate='no']"],
+    "inputType": "contenteditable",
+    "injectMethod": "execCommand",
+    "containerSelector": "main",
+    "icon": "🟤"
+  },
+  "gemini": {
+    "name": "Gemini",
+    "hostnames": ["gemini.google.com"],
+    "selectors": ["div.ql-editor[contenteditable='true']", "rich-textarea div[contenteditable='true']", "div[role='textbox'][contenteditable='true']"],
+    "inputType": "contenteditable",
+    "injectMethod": "execCommand",
+    "containerSelector": "body",
+    "icon": "🔵"
+  },
+  "grok": {
+    "name": "Grok",
+    "hostnames": ["x.com", "grok.com"],
+    "selectors": ["textarea[placeholder]", "div[role='textbox']", "div[contenteditable='true']"],
+    "inputType": "textarea",
+    "injectMethod": "react-synthetic",
+    "containerSelector": "main",
+    "icon": "⚡"
+  },
+  "perplexity": {
+    "name": "Perplexity",
+    "hostnames": ["www.perplexity.ai", "perplexity.ai"],
+    "selectors": ["textarea[placeholder]", "textarea[autofocus]", "div[contenteditable='true']"],
+    "inputType": "textarea",
+    "injectMethod": "react-synthetic",
+    "containerSelector": "main",
+    "icon": "🔍"
+  },
+  "deepseek": {
+    "name": "DeepSeek",
+    "hostnames": ["chat.deepseek.com"],
+    "selectors": ["textarea#chat-input", "textarea[placeholder]", "div[contenteditable='true']"],
+    "inputType": "textarea",
+    "injectMethod": "react-synthetic",
+    "containerSelector": "main",
+    "icon": "🐋"
+  },
+  "copilot": {
+    "name": "Copilot",
+    "hostnames": ["copilot.microsoft.com"],
+    "selectors": ["textarea[id*='searchbox']", "textarea[placeholder]", "#searchbox"],
+    "inputType": "textarea",
+    "injectMethod": "react-synthetic",
+    "containerSelector": "main",
+    "icon": "🪟"
+  }
+}

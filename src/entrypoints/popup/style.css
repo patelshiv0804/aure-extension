@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --aure-primary: #7C5CFC;
+  --aure-secondary: #A78BFA;
+  --aure-bg: #FAFAFE;
+  --aure-surface: #FFFFFF;
+  --aure-border: #ECE9FF;
+  --aure-hover: #F5F3FF;
+  --aure-text: #1a1a2e;
+  --aure-muted: #8E8EA0;
+  --aure-success: #34D399;
+  --aure-warning: #F59E0B;
+}
+
+html, body, #root {
+  width: 380px;
+  min-height: 520px;
+  max-height: 600px;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--aure-bg);
+  color: var(--aure-text);
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Premium scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(124, 92, 252, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(124, 92, 252, 0.25);
+}
+
+/* Focus ring for keyboard nav */
+*:focus-visible {
+  outline: 2px solid var(--aure-primary);
+  outline-offset: 2px;
+  border-radius: 8px;
+}

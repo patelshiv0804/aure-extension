@@ -1,0 +1,83 @@
+{
+  "manifest_version": 3,
+  "name": "AURE",
+  "description": "Enhance your AI prompts across ChatGPT, Claude, Gemini, and more.",
+  "version": "1.0.0",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "sidePanel"
+  ],
+  "host_permissions": [
+    "https://chat.openai.com/*",
+    "https://chatgpt.com/*",
+    "https://claude.ai/*",
+    "https://gemini.google.com/*",
+    "https://x.com/i/grok*",
+    "https://grok.com/*",
+    "https://www.perplexity.ai/*",
+    "https://chat.deepseek.com/*",
+    "https://copilot.microsoft.com/*",
+    "http://127.0.0.1:8000/*",
+    "http://localhost:8000/*"
+  ],
+  "commands": {
+    "enhance-prompt": {
+      "suggested_key": { "default": "Alt+E" },
+      "description": "Enhance current prompt"
+    },
+    "change-mode": {
+      "suggested_key": { "default": "Alt+M" },
+      "description": "Change enhancement mode"
+    },
+    "open-history": {
+      "suggested_key": { "default": "Alt+H" },
+      "description": "Open prompt history"
+    }
+  },
+  "background": {
+    "service_worker": "dist/background.js"
+  },
+  "action": {
+    "default_title": "AURE",
+    "default_popup": "dist/popup.html"
+  },
+  "options_ui": {
+    "open_in_tab": true,
+    "page": "dist/options.html"
+  },
+  "side_panel": {
+    "default_path": "dist/sidepanel.html"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["logo.png", "icons/*"],
+      "matches": ["*://*/*"]
+    }
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://chat.openai.com/*",
+        "https://chatgpt.com/*",
+        "https://claude.ai/*",
+        "https://gemini.google.com/*",
+        "https://x.com/i/grok*",
+        "https://grok.com/*",
+        "https://www.perplexity.ai/*",
+        "https://chat.deepseek.com/*",
+        "https://copilot.microsoft.com/*"
+      ],
+      "run_at": "document_idle",
+      "js": [
+        "dist/content.js"
+      ]
+    }
+  ]
+}
