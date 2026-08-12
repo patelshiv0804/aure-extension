@@ -24,10 +24,17 @@ export abstract class BaseAdapter implements SiteAdapter {
    * Detect the prompt input element using configured selectors.
    */
   detectInput(): HTMLElement | null {
+    if (this.currentInput && this.currentInput.isConnected && this.isVisible(this.currentInput)) {
+      return this.currentInput;
+    }
+
+    // Clear stale ref
+    this.currentInput = null;
+
     for (const selector of this.config.selectors) {
       try {
         const el = document.querySelector<HTMLElement>(selector);
-        if (el && this.isVisible(el)) {
+        if (el && el.isConnected && this.isVisible(el)) {
           this.currentInput = el;
           return el;
         }
@@ -35,6 +42,7 @@ export abstract class BaseAdapter implements SiteAdapter {
         // Invalid selector, skip
       }
     }
+
     return null;
   }
 

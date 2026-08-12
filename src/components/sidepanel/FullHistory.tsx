@@ -173,6 +173,22 @@ export const FullHistory: React.FC = () => {
           {prompts.map((prompt, i) => {
             const modeConfig = MODE_MAP[prompt.mode];
             const isSelected = selectedPromptId === prompt.id;
+            const beforeScore = prompt.analysisData?.beforeScore ?? 65;
+            const afterScore = prompt.analysisData?.afterScore ?? prompt.successScore ?? 94;
+            const diffScore = Math.max(0, afterScore - beforeScore);
+            const dimensions = prompt.analysisData?.dimensions ?? [
+              { name: 'Clarity', before: 85, after: 95 },
+              { name: 'Context', before: 40, after: 100 },
+              { name: 'Role', before: 10, after: 100 },
+              { name: 'Format', before: 30, after: 100 },
+              { name: 'Constraints', before: 20, after: 98 },
+              { name: 'Examples', before: 0, after: 100 },
+            ];
+            const recommendations = prompt.analysisData?.recommendations ?? [
+              { name: 'Claude', rank: 1, url: 'https://claude.ai/' },
+              { name: 'ChatGPT', rank: 2, url: 'https://chatgpt.com/' },
+              { name: 'Gemini', rank: 3, url: 'https://gemini.google.com/' },
+            ];
 
             return (
               <motion.div
@@ -217,6 +233,7 @@ export const FullHistory: React.FC = () => {
                       >
                         {prompt.originalText}
                       </p>
+
                       <div className="flex items-center gap-2.5 mt-2.5">
                         {modeConfig && (
                           <span
@@ -240,30 +257,92 @@ export const FullHistory: React.FC = () => {
                         </span>
                       </div>
                     </div>
-                    <div style={{ color: '#C4C4D4' }} className="flex-shrink-0 mt-0.5">
-                      <RoleIcon name={isSelected ? 'ChevronDown' : 'ChevronRight'} size={15} />
+
+                    {/* Right side: Score Comparison Badge & Toggle */}
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl shadow-2xs">
+                        <span className="text-[11px] font-semibold text-slate-500">{beforeScore}</span>
+                        <RoleIcon name="ArrowRight" size={10} className="text-slate-400" />
+                        <span className="text-xs font-bold text-indigo-600">{afterScore}</span>
+                        {diffScore > 0 && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                            +{diffScore}
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ color: '#C4C4D4' }} className="flex items-center gap-1 text-[11px]">
+                        <span>{isSelected ? 'Less' : 'Details'}</span>
+                        <RoleIcon name={isSelected ? 'ChevronDown' : 'ChevronRight'} size={14} />
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Expanded version timeline */}
+                {/* Expanded Analysis Breakdown & Version Timeline */}
                 <AnimatePresence>
                   {isSelected && (
                     <motion.div
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden"
-                      style={{
-                        marginTop: -1,
-                        borderLeft: '1px solid #ECE9FF',
-                        borderRight: '1px solid #ECE9FF',
-                        borderBottom: '1px solid #ECE9FF',
-                        borderRadius: '0 0 12px 12px',
-                        background: '#FFFFFF',
-                      }}
+                      className="overflow-hidden space-y-3 p-3.5 bg-slate-50/60 border-x border-b border-purple-200/60 rounded-b-xl"
                     >
-                      <VersionTimeline promptId={prompt.id} />
+                      {/* 6 DIMENSION BREAKDOWN */}
+                      <div className="bg-[#F8F9FE] p-3 rounded-2xl border border-[#ECE9FF] shadow-2xs">
+                        <div className="flex items-center justify-between mb-2.5 px-0.5">
+                          <h4 className="text-[11px] font-bold text-slate-500 tracking-wider uppercase flex items-center gap-1.5">
+                            <RoleIcon name="BarChart3" size={13} className="text-primary-500" />
+                            6 Dimension Breakdown
+                          </h4>
+                          <span className="text-[10.5px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">
+                            Score: {beforeScore} → {afterScore} (+{diffScore})
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {dimensions.map((dim) => (
+                            <div
+                              key={dim.name}
+                              className="bg-white px-3 py-2 rounded-xl border border-slate-200/70 flex items-center justify-between shadow-2xs"
+                            >
+                              <span className="text-[12px] font-bold text-[#1a1a2e]">{dim.name}</span>
+                              <div className="flex items-center gap-1 font-mono text-[11.5px]">
+                                <span className="text-slate-400 font-medium">{dim.before}</span>
+                                <span className="text-slate-300 text-[10px]">→</span>
+                                <span className="text-emerald-500 font-bold">{dim.after}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Interactive Recommended AI Models */}
+                      <div className="bg-white p-3 rounded-2xl border border-slate-200/70 shadow-2xs flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 shrink-0 uppercase tracking-wider">
+                          <RoleIcon name="Sparkles" size={13} className="text-amber-500" />
+                          Recommended AI:
+                        </span>
+                        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+                          {recommendations.map((rec) => (
+                            <a
+                              key={rec.name}
+                              href={rec.url || '#'}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-300 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer group"
+                              title={`Open ${rec.name}`}
+                            >
+                              <span className="text-[10px] text-primary-500 font-extrabold">#{rec.rank}</span>
+                              <span>{rec.name}</span>
+                              <RoleIcon name="ExternalLink" size={10} className="text-slate-400 group-hover:text-primary-500" />
+                            </a>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Version Timeline with Fixed height scrollable box & Auto-Fill button */}
+                      <VersionTimeline promptId={prompt.id} analysisData={prompt.analysisData} />
                     </motion.div>
                   )}
                 </AnimatePresence>

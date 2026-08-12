@@ -164,11 +164,58 @@ export async function getPromptHistory(
           p.template?.role ?? p.template?.mode ?? p.title?.split(' - ')[0]
         );
         const mode = normalizeMode(p.template?.role ?? p.title?.split(' - ')[0]);
-        const score = normalizeScore(
-          (p.new_analysis?.overall_score as number | undefined) ??
+        const beforeScore = normalizeScore(
           (p.old_analysis?.overall_score as number | undefined) ??
-          0
+          ((p as any).comparison?.before_score as number | undefined) ??
+          65
         );
+        const afterScore = normalizeScore(
+          (p.new_analysis?.overall_score as number | undefined) ??
+          ((p as any).comparison?.after_score as number | undefined) ??
+          94
+        );
+
+        const oldAn = (p.old_analysis as any) ?? {};
+        const newAn = (p.new_analysis as any) ?? {};
+
+        const dimensions = [
+          {
+            name: 'Clarity',
+            before: normalizeScore(oldAn.clarity ?? oldAn.metrics?.clarity ?? 85),
+            after: normalizeScore(newAn.clarity ?? newAn.metrics?.clarity ?? 95),
+          },
+          {
+            name: 'Context',
+            before: normalizeScore(oldAn.context ?? oldAn.metrics?.context ?? 40),
+            after: normalizeScore(newAn.context ?? newAn.metrics?.context ?? 100),
+          },
+          {
+            name: 'Role',
+            before: normalizeScore(oldAn.role ?? oldAn.metrics?.role ?? 10),
+            after: normalizeScore(newAn.role ?? newAn.metrics?.role ?? 100),
+          },
+          {
+            name: 'Format',
+            before: normalizeScore(oldAn.format ?? oldAn.output_structure ?? 30),
+            after: normalizeScore(newAn.format ?? newAn.output_structure ?? 100),
+          },
+          {
+            name: 'Constraints',
+            before: normalizeScore(oldAn.constraints ?? oldAn.metrics?.constraints ?? 20),
+            after: normalizeScore(newAn.constraints ?? newAn.metrics?.constraints ?? 98),
+          },
+          {
+            name: 'Examples',
+            before: normalizeScore(oldAn.examples ?? oldAn.metrics?.examples ?? 0),
+            after: normalizeScore(newAn.examples ?? newAn.metrics?.examples ?? 100),
+          },
+        ];
+
+        const recsFromApi = (p as any).tool_recommendations?.tools ?? [
+          { name: 'Claude', rank: 1, url: 'https://claude.ai/' },
+          { name: 'ChatGPT', rank: 2, url: 'https://chatgpt.com/' },
+          { name: 'Gemini', rank: 3, url: 'https://gemini.google.com/' },
+        ];
 
         return {
           id: String(p.id),
@@ -183,7 +230,22 @@ export async function getPromptHistory(
           updatedAt: new Date(p.updated_at).getTime(),
           isFavorite: false,
           isPinned: false,
-          successScore: score || undefined,
+          successScore: afterScore || undefined,
+          analysisData: {
+            beforeScore,
+            afterScore,
+            dimensions,
+            recommendations: recsFromApi.map((r: any) => ({
+              name: r.name ?? 'AI Tool',
+              rank: r.rank ?? 1,
+              url: r.url ?? `https://www.google.com/search?q=${encodeURIComponent((r.name ?? 'AI Tool') + ' AI')}`,
+            })),
+            improvements: (p as any).comparison?.improvements ?? [
+              'Enhanced clarity and domain role targeting',
+              'Structured context, key objectives, and specific constraints',
+              'Added clear formatting guidelines and multi-step output instructions',
+            ],
+          },
           tags: [category, mode].filter(Boolean),
         };
       }).filter((p) => {

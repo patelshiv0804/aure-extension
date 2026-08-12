@@ -74,6 +74,52 @@ export default defineBackground(() => {
     return { success: true };
   });
 
+  onMessage('FILL_PROMPT', async (payload) => {
+    // 1. Query all open tabs across windows
+    const allTabs = await chrome.tabs.query({});
+
+    // 2. Find active HTTP/HTTPS webpage tab (excluding chrome-extension://)
+    let targetTab = allTabs.find(
+      (t) => t.active && t.url && (t.url.startsWith('http://') || t.url.startsWith('https://'))
+    );
+
+    // 3. If not found, find any open tab on ChatGPT, Claude, Gemini, etc.
+    if (!targetTab) {
+      targetTab = allTabs.find(
+        (t) =>
+          t.url &&
+          (t.url.includes('chatgpt.com') ||
+            t.url.includes('chat.openai.com') ||
+            t.url.includes('claude.ai') ||
+            t.url.includes('gemini.google.com') ||
+            t.url.includes('perplexity.ai') ||
+            t.url.includes('grok.com') ||
+            t.url.includes('deepseek.com'))
+      );
+    }
+
+    // 4. Final fallback: active tab
+    if (!targetTab) {
+      const activeTabs = await chrome.tabs.query({ active: true });
+      targetTab = activeTabs.find((t) => t.url && !t.url.startsWith('chrome-extension://')) ?? activeTabs[0];
+    }
+
+    if (!targetTab?.id) {
+      return { success: false, error: 'No active webpage tab found' };
+    }
+
+    try {
+      const response = await chrome.tabs.sendMessage(targetTab.id, {
+        type: 'FILL_PROMPT',
+        payload: { text: payload.text },
+      });
+      return response ?? { success: true };
+    } catch (err) {
+      console.warn('[AURE Background] Send FILL_PROMPT to tab failed:', err);
+      return { success: false, error: String(err) };
+    }
+  });
+
   // ── Chrome Commands (Keyboard Shortcuts) ────────────────────
 
   chrome.commands.onCommand.addListener(async (command, tab) => {

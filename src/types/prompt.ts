@@ -4,6 +4,29 @@
 
 import type { EnhancementMode, PromptCategory } from './enhancement';
 
+export interface DimensionScore {
+  name: string;
+  before: number;
+  after: number;
+  score?: number;
+}
+
+export interface PromptToolRecommendation {
+  name: string;
+  rank: number;
+  url?: string;
+}
+
+export interface PromptAnalysisData {
+  beforeScore: number;
+  afterScore: number;
+  gradeBefore?: string;
+  gradeAfter?: string;
+  dimensions: DimensionScore[];
+  recommendations: PromptToolRecommendation[];
+  improvements?: string[];
+}
+
 export interface Prompt {
   id: string;
   title: string;
@@ -18,6 +41,7 @@ export interface Prompt {
   isFavorite: boolean;
   isPinned: boolean;
   successScore?: number;
+  analysisData?: PromptAnalysisData;
   tags?: string[];
 }
 

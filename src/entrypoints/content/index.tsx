@@ -50,6 +50,58 @@ export default defineContentScript({
     const root = ReactDOM.createRoot(appContainer);
     root.render(React.createElement(ContentRoot, { adapter }));
 
+    // Message listener for auto-filling prompt in input textarea
+    chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+      if (message?.type === 'FILL_PROMPT' && message.payload?.text) {
+        const promptText = message.payload.text;
+        
+        (async () => {
+          try {
+            await adapter.injectPrompt(promptText);
+            sendResponse({ success: true });
+          } catch (err) {
+            console.warn('[AURE Content] Adapter injectPrompt failed, trying fallback search:', err);
+            // Universal Fallback Search
+            const fallbackEl = document.querySelector<HTMLElement>(
+              '#prompt-textarea, textarea, div[contenteditable="true"], div[role="textbox"]'
+            );
+            if (fallbackEl) {
+              fallbackEl.focus();
+              fallbackEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              
+              if (fallbackEl instanceof HTMLTextAreaElement || fallbackEl instanceof HTMLInputElement) {
+                const nativeSetter = Object.getOwnPropertyDescriptor(
+                  Object.getPrototypeOf(fallbackEl),
+                  'value'
+                )?.set;
+                if (nativeSetter) {
+                  nativeSetter.call(fallbackEl, promptText);
+                } else {
+                  fallbackEl.value = promptText;
+                }
+                fallbackEl.dispatchEvent(new Event('input', { bubbles: true }));
+                fallbackEl.dispatchEvent(new Event('change', { bubbles: true }));
+              } else {
+                const selection = window.getSelection();
+                const range = document.createRange();
+                range.selectNodeContents(fallbackEl);
+                selection?.removeAllRanges();
+                selection?.addRange(range);
+                document.execCommand('insertText', false, promptText);
+                fallbackEl.dispatchEvent(
+                  new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: promptText })
+                );
+              }
+              sendResponse({ success: true });
+            } else {
+              sendResponse({ success: false, error: 'Input element not found' });
+            }
+          }
+        })();
+        return true;
+      }
+    });
+
     // Cleanup on context invalidation
     _ctx.onInvalidated(() => {
       root.unmount();

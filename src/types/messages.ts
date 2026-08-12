@@ -65,6 +65,10 @@ export interface MessageMap {
     payload: { text: string; tabId: number };
     response: { success: boolean };
   };
+  FILL_PROMPT: {
+    payload: { text: string };
+    response: { success: boolean };
+  };
 }
 
 export interface ModelRecommendation {
