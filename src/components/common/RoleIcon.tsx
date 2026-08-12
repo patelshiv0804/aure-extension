@@ -80,6 +80,8 @@ import {
   TrendingUp,
   Info,
   Crown,
+  LogOut,
+  User,
 } from 'lucide-react';
 
 interface RoleIconProps {
@@ -165,6 +167,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   TrendingUp,
   Info,
   Crown,
+  LogOut,
+  User,
 };
 
 export const RoleIcon: React.FC<RoleIconProps> = ({

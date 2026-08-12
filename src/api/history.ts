@@ -223,17 +223,15 @@ export async function getPromptHistory(
     console.warn('[AURE] API history fetch fallback to dummy data:', error);
   }
 
-  // Fallback to rich dummy data for UI testing & offline mode
-  const filtered = getFilteredDummyPrompts(filters);
+  // Return empty history when unauthenticated or fetch fails
   const result: PromptHistoryResult = {
-    prompts: filtered,
-    total: filtered.length,
+    prompts: [],
+    total: 0,
     page: 1,
     limit: 20,
     hasMore: false,
   };
 
-  historyCache.set(cacheKey, result);
   return result;
 }
 

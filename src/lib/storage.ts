@@ -5,10 +5,23 @@
 import type { ExtensionSettings } from '@/types/settings';
 import { DEFAULT_SETTINGS } from '@/types/settings';
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  display_name: string | null;
+  plan: string;
+  avatar_url: string | null;
+  role?: string | null;
+  onboarding_completed?: boolean;
+}
+
 /** Keys and their types for chrome.storage */
 interface StorageSchema {
   settings: ExtensionSettings;
   apiToken: string;
+  promptiq_token: string;
+  currentUserEmail: string;
+  userProfile: UserProfile;
   floatingButtonPosition: { x: number; y: number };
   lastSyncTimestamp: number;
   promptCache: Record<string, unknown>;

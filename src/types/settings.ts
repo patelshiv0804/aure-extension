@@ -39,9 +39,9 @@ export interface ExtensionSettings {
   advanced: {
     customSelectors: Record<string, string[]>;
     customPromptTemplates: CustomPromptTemplate[];
-    apiEndpoint: string;
-    apiKey: string;
-    currentUserEmail: string;
+    apiEndpoint?: string;
+    apiKey?: string;
+    currentUserEmail?: string;
     debugMode: boolean;
   };
 }
@@ -80,9 +80,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   advanced: {
     customSelectors: {},
     customPromptTemplates: [],
-    apiEndpoint: 'http://127.0.0.1:8000/api/v1',
-    apiKey: '',
-    currentUserEmail: 'kartikjaju0@gmail.com',
     debugMode: false,
   },
 };

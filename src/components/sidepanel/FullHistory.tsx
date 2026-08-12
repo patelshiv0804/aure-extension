@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { sendMessage } from '@/lib/messaging';
+import { useAuthStore } from '@/stores/auth.store';
 import { VersionTimeline } from '@/components/popup/VersionTimeline';
 import type { Prompt, PromptHistoryFilters } from '@/types/prompt';
 import { MODE_MAP } from '@/constants/modes';
@@ -16,8 +17,32 @@ export const FullHistory: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState<PromptHistoryFilters['timeRange']>('all');
   const [selectedPromptId, setSelectedPromptId] = useState<string | null>(null);
+  const { isAuthenticated, loadAuth } = useAuthStore();
+
+  useEffect(() => {
+    loadAuth();
+
+    const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+      if (
+        areaName === 'local' &&
+        (changes['userProfile'] || changes['promptiq_token'] || changes['apiToken'] || changes['currentUserEmail'])
+      ) {
+        loadAuth();
+      }
+    };
+
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
+      chrome.storage.onChanged.addListener(handleStorageChange);
+      return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+    }
+  }, [loadAuth]);
 
   const fetchHistory = useCallback(async () => {
+    if (!isAuthenticated) {
+      setPrompts([]);
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const result = await sendMessage('GET_HISTORY', {
@@ -25,13 +50,13 @@ export const FullHistory: React.FC = () => {
         search: searchQuery || undefined,
         limit: 50,
       });
-      setPrompts(result.prompts);
+      setPrompts(result.prompts || []);
     } catch (error) {
       console.error('Failed to fetch history:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [timeFilter, searchQuery]);
+  }, [timeFilter, searchQuery, isAuthenticated]);
 
   useEffect(() => {
     fetchHistory();
@@ -96,7 +121,29 @@ export const FullHistory: React.FC = () => {
       </div>
 
       {/* Results */}
-      {isLoading ? (
+      {!isAuthenticated ? (
+        <div className="text-center py-14 px-4 flex flex-col items-center gap-3.5 bg-white border border-[#ECE9FF] rounded-2xl shadow-xs">
+          <div
+            className="w-12 h-12 rounded-2xl flex items-center justify-center"
+            style={{ background: '#F5F3FF', color: '#7C5CFC' }}
+          >
+            <RoleIcon name="User" size={22} />
+          </div>
+          <div className="space-y-1">
+            <p className="text-[14px] font-bold text-[#1a1a2e]">Sign In Required</p>
+            <p className="text-[12px] text-[#8E8EA0] max-w-[220px]">
+              Please sign in to view your prompt history and sync prompts across devices.
+            </p>
+          </div>
+          <button
+            onClick={() => chrome.runtime.openOptionsPage()}
+            className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all"
+            style={{ background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)' }}
+          >
+            Sign In to AURE
+          </button>
+        </div>
+      ) : isLoading ? (
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => (
             <div

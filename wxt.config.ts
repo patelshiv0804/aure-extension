@@ -8,7 +8,7 @@ export default defineConfig({
     name: 'AURE',
     description: 'Enhance your AI prompts across ChatGPT, Claude, Gemini, and more.',
     version: '1.0.0',
-    permissions: ['storage', 'activeTab', 'sidePanel'],
+    permissions: ['storage', 'activeTab', 'sidePanel', 'cookies'],
     host_permissions: [
       'https://chat.openai.com/*',
       'https://chatgpt.com/*',
@@ -57,6 +57,7 @@ export default defineConfig({
     build: {
       target: 'esnext',
       minify: 'esbuild',
+      modulePreload: false,
     },
   }),
 });

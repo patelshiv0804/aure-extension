@@ -5,19 +5,23 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useSettingsStore } from '@/stores/settings.store';
+import { useAuthStore } from '@/stores/auth.store';
+import { AuthView } from '../auth/AuthView';
 import { ENHANCEMENT_MODES } from '@/constants/modes';
 import { AI_MODELS } from '@/constants/models';
 import type { EnhancementMode } from '@/types/enhancement';
 import { RoleIcon } from '../common/RoleIcon';
 
-type SettingsSection = 'general' | 'ui' | 'ai' | 'privacy' | 'advanced';
+type SettingsSection = 'account' | 'general' | 'ui' | 'ai' | 'privacy' | 'advanced';
 
 export const SettingsRoot: React.FC = () => {
-  const [activeSection, setActiveSection] = useState<SettingsSection>('general');
+  const [activeSection, setActiveSection] = useState<SettingsSection>('account');
   const { settings, updateSettings, loadSettings, resetSettings } = useSettingsStore();
+  const { loadAuth } = useAuthStore();
 
   useEffect(() => {
     loadSettings();
+    loadAuth();
 
     // Reset html/body styling inside options page to prevent popup dimensions from leaking
     const resetStyles = () => {
@@ -38,9 +42,10 @@ export const SettingsRoot: React.FC = () => {
     // Re-apply on slight delay to overwrite WXT injects
     const timer = setTimeout(resetStyles, 100);
     return () => clearTimeout(timer);
-  }, [loadSettings]);
+  }, [loadSettings, loadAuth]);
 
   const sections: Array<{ id: SettingsSection; label: string; icon: string }> = [
+    { id: 'account', label: 'Account', icon: '👤' },
     { id: 'general', label: 'General', icon: '⚙️' },
     { id: 'ui', label: 'Appearance', icon: '🎨' },
     { id: 'ai', label: 'AI Models', icon: '🤖' },
@@ -81,7 +86,7 @@ export const SettingsRoot: React.FC = () => {
               className={`
                 w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors
                 ${activeSection === section.id
-                  ? 'bg-primary-500/10 text-primary-400'
+                  ? 'bg-primary-500/10 text-primary-400 font-semibold'
                   : 'text-slate-500 hover:text-slate-700 hover:bg-white'
                 }
               `}
@@ -111,6 +116,17 @@ export const SettingsRoot: React.FC = () => {
           transition={{ duration: 0.15 }}
           className="space-y-6 pb-20"
         >
+          {/* ── Account ──────────────────────── */}
+          {activeSection === 'account' && (
+            <>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900 mb-1">Account & Authentication</h2>
+                <p className="text-xs text-slate-500">Manage your signed-in profile and HTTP cookie session</p>
+              </div>
+              <AuthView />
+            </>
+          )}
+
           {/* ── General ──────────────────────── */}
           {activeSection === 'general' && (
             <>
@@ -327,48 +343,10 @@ export const SettingsRoot: React.FC = () => {
             <>
               <div>
                 <h2 className="text-lg font-semibold text-slate-900 mb-1">Advanced</h2>
-                <p className="text-xs text-slate-500">API configuration and custom selectors</p>
+                <p className="text-xs text-slate-500">Extension diagnostics and developer tools</p>
               </div>
 
               <div className="space-y-4">
-                <div className="p-4 rounded-xl bg-white border border-slate-200/60">
-                  <div className="text-sm text-slate-800 mb-2">API Endpoint</div>
-                  <input
-                    type="text"
-                    value={settings.advanced.apiEndpoint}
-                    onChange={(e) => updateSettings({
-                      advanced: { ...settings.advanced, apiEndpoint: e.target.value },
-                    })}
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-primary-500/40 font-mono"
-                  />
-                </div>
-
-                <div className="p-4 rounded-xl bg-white border border-slate-200/60">
-                  <div className="text-sm text-slate-800 mb-2">API Key</div>
-                  <input
-                    type="password"
-                    value={settings.advanced.apiKey}
-                    onChange={(e) => updateSettings({
-                      advanced: { ...settings.advanced, apiKey: e.target.value },
-                    })}
-                    placeholder="Enter your API key"
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-primary-500/40 font-mono"
-                  />
-                </div>
-
-                <div className="p-4 rounded-xl bg-white border border-slate-200/60">
-                  <div className="text-sm text-slate-800 mb-2">Backend User Email</div>
-                  <input
-                    type="email"
-                    value={settings.advanced.currentUserEmail}
-                    onChange={(e) => updateSettings({
-                      advanced: { ...settings.advanced, currentUserEmail: e.target.value },
-                    })}
-                    placeholder="user@example.com"
-                    className="w-full px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg text-slate-800 outline-none focus:border-primary-500/40 font-mono"
-                  />
-                </div>
-
                 <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-slate-200/60">
                   <div>
                     <div className="text-sm text-slate-800">Debug Mode</div>

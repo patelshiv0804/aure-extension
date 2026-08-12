@@ -3,6 +3,7 @@
 // ──────────────────────────────────────────────────────────────
 
 import { getStorage } from '@/lib/storage';
+import { getAuthCookie } from '@/lib/cookies';
 import { checkRateLimit, getRetryAfter } from '@/lib/rate-limiter';
 
 export class ApiError extends Error {
@@ -37,27 +38,24 @@ const RETRY_BASE_DELAY = 1000;
  */
 async function getBaseUrl(): Promise<string> {
   const settings = await getStorage('settings');
-  return (settings?.advanced?.apiEndpoint ?? 'http://127.0.0.1:8000/api/v1').replace(/\/$/, '');
+  const endpoint = (settings?.advanced as any)?.apiEndpoint || 'http://127.0.0.1:8000/api/v1';
+  return endpoint.replace(/\/$/, '');
 }
 
 /**
- * Get the stored API token.
+ * Get the stored API token from HTTP cookie or storage.
  */
 async function getApiToken(): Promise<string | undefined> {
-  const settings = await getStorage('settings');
-  return settings?.advanced?.apiKey || getStorage('apiToken');
+  const cookieToken = await getAuthCookie();
+  if (cookieToken) return cookieToken;
+  const promptiqToken = await getStorage('promptiq_token');
+  if (promptiqToken) return promptiqToken;
+  const storageToken = await getStorage('apiToken');
+  return storageToken;
 }
 
 /**
- * Get the simulated backend user email used by Prompt_Enhancer.
- */
-async function getCurrentUserEmail(): Promise<string | undefined> {
-  const settings = await getStorage('settings');
-  return settings?.advanced?.currentUserEmail || 'kartikjaju0@gmail.com';
-}
-
-/**
- * Make an authenticated API request with retry logic.
+ * Make an authenticated API request with retry logic and cookie credentials.
  */
 export async function apiRequest<T>(config: RequestConfig): Promise<T> {
   // Rate limit check
@@ -73,7 +71,11 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
 
   const baseUrl = await getBaseUrl();
   const token = await getApiToken();
-  const currentUserEmail = await getCurrentUserEmail();
+  const storedEmail = await getStorage('currentUserEmail');
+  const profile = await getStorage('userProfile');
+  const currentUserEmail = (typeof storedEmail === 'string' && storedEmail.trim())
+    ? storedEmail.trim()
+    : profile?.email;
 
   let url = `${baseUrl}${config.path}`;
 
@@ -83,8 +85,9 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
     url += `?${searchParams.toString()}`;
   }
 
+  const isFormBody = config.body instanceof URLSearchParams || config.body instanceof FormData;
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
+    ...(isFormBody ? {} : { 'Content-Type': 'application/json' }),
     ...config.headers,
   };
 
@@ -109,7 +112,8 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
       const response = await fetch(url, {
         method: config.method,
         headers,
-        body: config.body ? JSON.stringify(config.body) : undefined,
+        body: config.body ? (isFormBody ? (config.body as BodyInit) : JSON.stringify(config.body)) : undefined,
+        credentials: 'include',
         signal: controller.signal,
       });
 

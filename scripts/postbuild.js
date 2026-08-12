@@ -124,8 +124,10 @@ try {
         let content = fs.readFileSync(filePath, 'utf8');
         content = content.replace(/="chunks\//g, '="/chunks/');
         content = content.replace(/="assets\//g, '="/assets/');
+        // Remove modulepreload links to prevent Chrome extension cross-world resource mismatch warning
+        content = content.replace(/<link rel="modulepreload"[^>]*>\s*/g, '');
         fs.writeFileSync(filePath, content, 'utf8');
-        console.log(`[Post-Build] Restored absolute asset paths in ${fileName}`);
+        console.log(`[Post-Build] Cleaned preloads & restored absolute paths in ${fileName}`);
       }
     });
   } else {

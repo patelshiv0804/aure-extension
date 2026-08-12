@@ -5,6 +5,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSettingsStore } from '@/stores/settings.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { ENHANCEMENT_MODES } from '@/constants/modes';
 import { sendMessage } from '@/lib/messaging';
 import { KEYBOARD_SHORTCUTS } from '@/constants/shortcuts';
@@ -14,6 +15,8 @@ import { RoleIcon } from '../common/RoleIcon';
 
 export const PopupRoot: React.FC = () => {
   const { settings, updateSettings, loadSettings } = useSettingsStore();
+  const { user, isAuthenticated, loadAuth, logout } = useAuthStore();
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [recentPrompt, setRecentPrompt] = useState<Prompt | null>(null);
   const [selectedRole, setSelectedRole] = useState<EnhancementMode>(
     (settings?.general?.defaultMode as EnhancementMode) || 'creator'
@@ -21,18 +24,24 @@ export const PopupRoot: React.FC = () => {
 
   useEffect(() => {
     loadSettings();
-  }, [loadSettings]);
+    loadAuth();
+  }, [loadSettings, loadAuth]);
 
   // Fetch most recent prompt
   useEffect(() => {
     const fetchRecent = async () => {
+      if (!isAuthenticated) {
+        setRecentPrompt(null);
+        return;
+      }
       try {
         const result = await sendMessage('GET_HISTORY', { limit: 1 });
         if (result.prompts?.length) setRecentPrompt(result.prompts[0]);
+        else setRecentPrompt(null);
       } catch { /* silent */ }
     };
     fetchRecent();
-  }, []);
+  }, [isAuthenticated]);
 
   // Sync selected role with settings
   useEffect(() => {
@@ -90,16 +99,94 @@ export const PopupRoot: React.FC = () => {
             </h1>
           </div>
         </div>
-        <button
-          onClick={() => chrome.runtime.openOptionsPage()}
-          className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200"
-          style={{ color: '#8E8EA0', background: 'transparent' }}
-          onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8E8EA0'; }}
-          title="Settings"
-        >
-          <RoleIcon name="Settings" size={18} strokeWidth={1.75} />
-        </button>
+        <div className="flex items-center gap-2">
+          {isAuthenticated && user ? (
+            <div className="relative">
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => chrome.runtime.openOptionsPage()}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-600 border border-primary-200/60 hover:bg-primary-100/70 transition-all text-xs font-semibold shadow-2xs"
+                  title={user.email}
+                >
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="max-w-[85px] truncate text-[11px] font-bold">
+                    {user.display_name || user.email.split('@')[0]}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setShowSignOutConfirm(!showSignOutConfirm)}
+                  className="w-7 h-7 rounded-full bg-rose-50 text-rose-500 border border-rose-200/70 hover:bg-rose-100 transition-all flex items-center justify-center shadow-2xs shrink-0"
+                  title="Sign Out"
+                >
+                  <RoleIcon name="LogOut" size={13} strokeWidth={2} />
+                </button>
+              </div>
+
+              {/* Two-step Sign Out Confirmation Popover */}
+              <AnimatePresence>
+                {showSignOutConfirm && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.94, y: 4 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.94, y: 4 }}
+                    className="absolute right-0 top-full mt-2 w-60 p-3.5 bg-white rounded-2xl shadow-xl border border-slate-100 z-50 text-left"
+                    style={{ boxShadow: '0 10px 25px rgba(0,0,0,0.12)' }}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div className="p-2 rounded-xl bg-rose-50 text-rose-500 shrink-0">
+                        <RoleIcon name="LogOut" size={15} strokeWidth={2} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-900">Sign Out of AURE?</h4>
+                        <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                          Are you sure you want to sign out of <strong className="text-slate-700">{user.email}</strong>?
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-1.5 mt-3 pt-2 border-t border-slate-100">
+                      <button
+                        onClick={() => setShowSignOutConfirm(false)}
+                        className="px-2.5 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-all"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={async () => {
+                          setShowSignOutConfirm(false);
+                          await logout();
+                        }}
+                        className="px-3 py-1 rounded-lg text-xs font-bold text-white bg-rose-500 hover:bg-rose-600 transition-all shadow-sm flex items-center gap-1"
+                      >
+                        <RoleIcon name="LogOut" size={12} />
+                        Sign Out
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <button
+              onClick={() => chrome.runtime.openOptionsPage()}
+              className="px-2.5 py-1 rounded-full bg-primary-500 hover:bg-primary-600 text-white text-[11px] font-bold shadow-sm transition-all"
+            >
+              Sign In
+            </button>
+          )}
+
+          <button
+            onClick={() => chrome.runtime.openOptionsPage()}
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200"
+            style={{ color: '#8E8EA0', background: 'transparent' }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8E8EA0'; }}
+            title="Settings"
+          >
+            <RoleIcon name="Settings" size={18} strokeWidth={1.75} />
+          </button>
+        </div>
       </div>
 
       {/* ── Recent Prompt ──────────────────────────────────── */}
