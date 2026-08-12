@@ -287,61 +287,138 @@ export const FullHistory: React.FC = () => {
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden space-y-3 p-3.5 bg-slate-50/60 border-x border-b border-purple-200/60 rounded-b-xl"
                     >
-                      {/* 6 DIMENSION BREAKDOWN */}
-                      <div className="bg-[#F8F9FE] p-3 rounded-2xl border border-[#ECE9FF] shadow-2xs">
-                        <div className="flex items-center justify-between mb-2.5 px-0.5">
-                          <h4 className="text-[11px] font-bold text-slate-500 tracking-wider uppercase flex items-center gap-1.5">
-                            <RoleIcon name="BarChart3" size={13} className="text-primary-500" />
-                            6 Dimension Breakdown
-                          </h4>
-                          <span className="text-[10.5px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200/50">
-                            Score: {beforeScore} → {afterScore} (+{diffScore})
-                          </span>
+
+                      {/* Interactive Recommended AI Models — Dark Theme Ranked Cards */}
+                      <div
+                        style={{
+                          background: 'linear-gradient(135deg, #1E1B4B 0%, #1a1a3e 100%)',
+                          border: '1px solid rgba(139, 92, 246, 0.3)',
+                          borderRadius: 18,
+                          padding: '12px 14px',
+                        }}
+                      >
+                        {/* Header */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <div
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 8,
+                              background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.4)',
+                              flexShrink: 0,
+                            }}
+                          >
+                            <span style={{ fontSize: 14 }}>✨</span>
+                          </div>
+                          <div>
+                            <p style={{ fontSize: 11, fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
+                              Best AI For This Prompt
+                            </p>
+                            <p style={{ fontSize: 10, color: '#6D5BD0', margin: 0 }}>Click to open in browser</p>
+                          </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-2">
-                          {dimensions.map((dim) => (
-                            <div
-                              key={dim.name}
-                              className="bg-white px-3 py-2 rounded-xl border border-slate-200/70 flex items-center justify-between shadow-2xs"
-                            >
-                              <span className="text-[12px] font-bold text-[#1a1a2e]">{dim.name}</span>
-                              <div className="flex items-center gap-1 font-mono text-[11.5px]">
-                                <span className="text-slate-400 font-medium">{dim.before}</span>
-                                <span className="text-slate-300 text-[10px]">→</span>
-                                <span className="text-emerald-500 font-bold">{dim.after}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                        {/* Ranked Cards */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {recommendations.map((rec) => {
+                            const rankConfig: Record<number, { badge: string; accent: string; glowColor: string; label: string; rankBg: string }> = {
+                              1: {
+                                badge: '🥇',
+                                accent: '#F59E0B',
+                                glowColor: 'rgba(245,158,11,0.15)',
+                                label: 'Best Match',
+                                rankBg: 'rgba(245,158,11,0.15)',
+                              },
+                              2: {
+                                badge: '🥈',
+                                accent: '#94A3B8',
+                                glowColor: 'rgba(148,163,184,0.1)',
+                                label: '2nd Choice',
+                                rankBg: 'rgba(148,163,184,0.15)',
+                              },
+                              3: {
+                                badge: '🥉',
+                                accent: '#CD7C4A',
+                                glowColor: 'rgba(205,124,74,0.12)',
+                                label: '3rd Choice',
+                                rankBg: 'rgba(205,124,74,0.15)',
+                              },
+                            };
+                            const cfg = rankConfig[rec.rank] ?? rankConfig[3];
+                            return (
+                              <a
+                                key={rec.name}
+                                href={rec.url || '#'}
+                                target="_blank"
+                                rel="noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title={`Open ${rec.name}`}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 10,
+                                  padding: '9px 12px',
+                                  borderRadius: 12,
+                                  background: `rgba(255,255,255,0.05)`,
+                                  border: `1px solid rgba(255,255,255,0.08)`,
+                                  textDecoration: 'none',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.15s ease, transform 0.15s ease',
+                                }}
+                                onMouseEnter={(e) => {
+                                  e.currentTarget.style.background = `rgba(124,92,252,0.15)`;
+                                  e.currentTarget.style.transform = 'translateY(-1px)';
+                                  e.currentTarget.style.border = '1px solid rgba(139, 92, 246, 0.4)';
+                                }}
+                                onMouseLeave={(e) => {
+                                  e.currentTarget.style.background = `rgba(255,255,255,0.05)`;
+                                  e.currentTarget.style.transform = 'none';
+                                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.08)';
+                                }}
+                              >
+                                {/* Medal */}
+                                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{cfg.badge}</span>
 
-                      {/* Interactive Recommended AI Models */}
-                      <div className="bg-white p-3 rounded-2xl border border-slate-200/70 shadow-2xs flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 shrink-0 uppercase tracking-wider">
-                          <RoleIcon name="Sparkles" size={13} className="text-amber-500" />
-                          Recommended AI:
-                        </span>
-                        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-                          {recommendations.map((rec) => (
-                            <a
-                              key={rec.name}
-                              href={rec.url || '#'}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-50 border border-slate-200/80 text-slate-700 hover:bg-primary-50 hover:text-primary-600 hover:border-primary-300 hover:scale-105 active:scale-95 transition-all flex items-center gap-1.5 shadow-2xs shrink-0 cursor-pointer group"
-                              title={`Open ${rec.name}`}
-                            >
-                              <span className="text-[10px] text-primary-500 font-extrabold">#{rec.rank}</span>
-                              <span>{rec.name}</span>
-                              <RoleIcon name="ExternalLink" size={10} className="text-slate-400 group-hover:text-primary-500" />
-                            </a>
-                          ))}
+                                {/* Name & label */}
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.01em' }}>
+                                    {rec.name}
+                                  </p>
+                                  <p style={{ margin: 0, fontSize: 10, color: cfg.accent, fontWeight: 600 }}>
+                                    {cfg.label}
+                                  </p>
+                                </div>
+
+                                {/* Rank pill + link icon */}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                  <span
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 800,
+                                      color: cfg.accent,
+                                      background: cfg.rankBg,
+                                      borderRadius: 6,
+                                      padding: '2px 7px',
+                                    }}
+                                  >
+                                    #{rec.rank}
+                                  </span>
+                                  <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex' }}>
+                                    <RoleIcon name="ExternalLink" size={11} />
+                                  </span>
+                                </div>
+                              </a>
+                            );
+                          })}
                         </div>
                       </div>
 
                       {/* Version Timeline with Fixed height scrollable box & Auto-Fill button */}
+
                       <VersionTimeline promptId={prompt.id} analysisData={prompt.analysisData} />
                     </motion.div>
                   )}

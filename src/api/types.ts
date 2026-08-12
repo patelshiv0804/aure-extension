@@ -104,6 +104,9 @@ export interface GetVersionsApiResponse {
     content?: string;
     change_summary?: string;
     created_at: string;
+    old_analysis?: Record<string, unknown> | null;
+    new_analysis?: Record<string, unknown> | null;
+    tool_recommendations?: Record<string, unknown> | null;
   }>;
   versions: Array<{
     id: string;
@@ -114,6 +117,8 @@ export interface GetVersionsApiResponse {
     mode?: EnhancementMode;
     created_at: string;
     metadata?: Record<string, unknown>;
+    old_analysis?: Record<string, unknown> | null;
+    new_analysis?: Record<string, unknown> | null;
   }>;
 }
 

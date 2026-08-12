@@ -54,6 +54,7 @@ export async function getVersions(promptId: string): Promise<PromptVersion[]> {
         text: v.content ?? v.change_summary ?? '',
         source: normalizeVersionSource(v.version_type),
         createdAt: new Date(v.created_at).getTime(),
+        analysisData: parseVersionAnalysis(v.old_analysis, v.new_analysis),
       }));
     }
 
@@ -67,6 +68,7 @@ export async function getVersions(promptId: string): Promise<PromptVersion[]> {
         mode: v.mode,
         createdAt: new Date(v.created_at).getTime(),
         metadata: v.metadata,
+        analysisData: parseVersionAnalysis(v.old_analysis, v.new_analysis),
       }));
     }
   } catch (error) {
@@ -108,4 +110,47 @@ function normalizeVersionSource(source?: string): 'user' | 'enhanced' | 'edited'
   if (source === 'user' || source === 'enhanced' || source === 'edited') return source;
   if (source === 'original') return 'user';
   return 'enhanced';
+}
+
+function parseVersionAnalysis(oldAnRaw?: any, newAnRaw?: any) {
+  if (!oldAnRaw && !newAnRaw) return undefined;
+  const oldAn = oldAnRaw ?? {};
+  const newAn = newAnRaw ?? {};
+
+  const norm = (val: any) => {
+    const num = Number(val);
+    if (!Number.isFinite(num)) return 0;
+    return Math.max(0, Math.min(100, num <= 10 ? Math.round(num * 10) : Math.round(num)));
+  };
+
+  const getScore = (an: any, keys: string[]) => {
+    for (const key of keys) {
+      if (an.dimensions?.[key]?.score !== undefined) return norm(an.dimensions[key].score);
+      if (an.dimensions?.[key] !== undefined && typeof an.dimensions[key] === 'number') return norm(an.dimensions[key]);
+      if (an.metrics?.[key]?.score !== undefined) return norm(an.metrics[key].score);
+      if (an.metrics?.[key] !== undefined && typeof an.metrics[key] === 'number') return norm(an.metrics[key]);
+      if (an[key]?.score !== undefined) return norm(an[key].score);
+      if (an[key] !== undefined && typeof an[key] === 'number') return norm(an[key]);
+    }
+    return 0;
+  };
+
+  const beforeScore = norm(oldAn.overall_score ?? 0);
+  const afterScore = norm(newAn.overall_score ?? beforeScore);
+
+  const dimensions = [
+    { name: 'Clarity', before: getScore(oldAn, ['clarity']), after: getScore(newAn, ['clarity']) },
+    { name: 'Context', before: getScore(oldAn, ['context']), after: getScore(newAn, ['context']) },
+    { name: 'Role', before: getScore(oldAn, ['role_definition', 'role']), after: getScore(newAn, ['role_definition', 'role']) },
+    { name: 'Format', before: getScore(oldAn, ['output_format', 'format']), after: getScore(newAn, ['output_format', 'format']) },
+    { name: 'Constraints', before: getScore(oldAn, ['constraints']), after: getScore(newAn, ['constraints']) },
+    { name: 'Examples', before: getScore(oldAn, ['examples', 'few_shot_examples']), after: getScore(newAn, ['examples', 'few_shot_examples']) },
+  ];
+
+  return {
+    beforeScore,
+    afterScore,
+    dimensions,
+    recommendations: [],
+  };
 }

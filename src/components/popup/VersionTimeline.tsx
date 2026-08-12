@@ -236,7 +236,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
             const isExpanded = expandedVersionId === version.id;
             const isFilled = filledId === version.id;
             const isCopied = copiedId === version.id;
-            const versionAnalysis = getDimensionScoresForVersion(version, i);
+            const curAnalysis = version.analysisData ?? analysisData;
 
             return (
               <motion.div
@@ -309,30 +309,46 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                   {version.text}
                 </div>
 
-                {/* Toggle 6 Dimension Scores for this version */}
-                {versionAnalysis && (
-                  <div className="mt-2">
+                {/* Overall Score Card Strip & 6 Dimension Breakdown for this version */}
+                {curAnalysis && (
+                  <div className="mt-2.5">
+                    {/* Score Trigger Card — always before → after */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setExpandedVersionId(isExpanded ? null : version.id);
                       }}
-                      className="flex items-center gap-1.5 text-[10.5px] font-semibold text-slate-500 hover:text-primary-600 transition-colors px-1 py-0.5"
+                      className="w-full p-3 rounded-2xl bg-[#F8F9FE] hover:bg-slate-100/90 border border-[#ECE9FF] transition-all text-left flex items-center justify-between shadow-2xs group cursor-pointer"
                     >
-                      <RoleIcon name="BarChart3" size={11} />
-                      <span>6 Dimension Score</span>
-                      <span
-                        className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                          version.source === 'user'
-                            ? 'bg-slate-100 text-slate-500'
-                            : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
-                        }`}
-                      >
-                        {versionAnalysis.totalScore}
-                      </span>
-                      <RoleIcon name={isExpanded ? 'ChevronDown' : 'ChevronRight'} size={11} />
+                      <div>
+                        <p className="text-[10px] font-bold text-purple-600 tracking-wider uppercase mb-0.5">
+                          SCORE
+                        </p>
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <span className="text-slate-400 font-semibold text-sm">{curAnalysis.beforeScore}</span>
+                          <span className="text-slate-300 text-xs">→</span>
+                          <span className="text-emerald-600 font-bold text-base">{curAnalysis.afterScore}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {curAnalysis.afterScore > curAnalysis.beforeScore ? (
+                          <span className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-600 border border-emerald-200/60 shadow-2xs">
+                            <RoleIcon name="TrendingUp" size={12} />
+                            +{curAnalysis.afterScore - curAnalysis.beforeScore} pts
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-slate-100 text-slate-500 border border-slate-200/60">
+                            Original
+                          </span>
+                        )}
+                        <div className="w-6 h-6 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-400 group-hover:text-purple-600 transition-colors">
+                          <RoleIcon name={isExpanded ? 'ChevronUp' : 'ChevronDown'} size={13} />
+                        </div>
+                      </div>
                     </button>
 
+                    {/* Expanded 6 Dimension Grid (Image 2) */}
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div
@@ -341,56 +357,45 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                           exit={{ opacity: 0, height: 0 }}
                           className="overflow-hidden"
                         >
-                          <div className="mt-2 p-3 bg-[#F8F9FE] rounded-xl border border-[#ECE9FF]">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                                {versionAnalysis.label}
-                              </span>
-                              <span
-                                className={`text-[10.5px] font-bold px-2 py-0.5 rounded-full ${
-                                  version.source === 'user'
-                                    ? 'bg-slate-100 text-slate-600 border border-slate-200/50'
-                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200/50'
-                                }`}
-                              >
-                                Score: {versionAnalysis.totalScore}
-                              </span>
-                            </div>
-                            <div className="grid grid-cols-2 gap-1.5">
-                              {versionAnalysis.dims.map((dim) => (
+                          <div className="mt-2 space-y-2.5">
+                            {/* Plain header — no box/border */}
+                            <p
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 700,
+                                color: '#64748B',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.07em',
+                                margin: 0,
+                              }}
+                            >
+                              6 Dimension Breakdown
+                            </p>
+
+                            {/* Grid — larger cards matching Image 2 */}
+                            <div className="grid grid-cols-2 gap-2">
+                              {curAnalysis.dimensions?.map((dim) => (
                                 <div
                                   key={dim.name}
-                                  className="bg-white px-2.5 py-1.5 rounded-lg border border-slate-200/70 flex items-center justify-between"
+                                  style={{
+                                    background: '#FFFFFF',
+                                    border: '1.5px solid #E8E4F8',
+                                    borderRadius: 16,
+                                    padding: '10px 14px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                  }}
                                 >
-                                  <span className="text-[11px] font-semibold text-[#1a1a2e]">{dim.name}</span>
-                                  <span
-                                    className="text-[11px] font-bold font-mono"
-                                    style={{ color: dim.color }}
-                                  >
-                                    {dim.score}
-                                  </span>
+                                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a2e' }}>{dim.name}</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace' }}>
+                                    <span style={{ fontSize: 12, fontWeight: 600, color: '#94A3B8' }}>{dim.before}</span>
+                                    <span style={{ fontSize: 11, color: '#CBD5E1' }}>→</span>
+                                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#10b981' }}>{dim.after}</span>
+                                  </div>
                                 </div>
                               ))}
                             </div>
-
-                            {/* Before → After comparison only on enhanced versions */}
-                            {version.source !== 'user' && analysisData?.dimensions && (
-                              <div className="mt-2 pt-2 border-t border-slate-200/60">
-                                <p className="text-[9.5px] text-slate-400 font-medium uppercase tracking-wider mb-1.5">Before → After</p>
-                                <div className="grid grid-cols-2 gap-1">
-                                  {analysisData.dimensions.map((dim) => (
-                                    <div key={dim.name} className="flex items-center justify-between bg-white rounded-lg px-2 py-1 border border-slate-100">
-                                      <span className="text-[10px] text-slate-600 font-medium">{dim.name}</span>
-                                      <div className="flex items-center gap-1 text-[10px] font-mono">
-                                        <span className="text-slate-400">{dim.before}</span>
-                                        <span className="text-slate-300">→</span>
-                                        <span className="text-emerald-500 font-bold">{dim.after}</span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </motion.div>
                       )}

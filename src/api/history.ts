@@ -164,50 +164,50 @@ export async function getPromptHistory(
           p.template?.role ?? p.template?.mode ?? p.title?.split(' - ')[0]
         );
         const mode = normalizeMode(p.template?.role ?? p.title?.split(' - ')[0]);
+        const oldAn = (p.old_analysis as any) ?? {};
+        const newAn = (p.new_analysis as any) ?? {};
+
         const beforeScore = normalizeScore(
-          (p.old_analysis?.overall_score as number | undefined) ??
+          oldAn.overall_score ??
           ((p as any).comparison?.before_score as number | undefined) ??
           65
         );
         const afterScore = normalizeScore(
-          (p.new_analysis?.overall_score as number | undefined) ??
+          newAn.overall_score ??
           ((p as any).comparison?.after_score as number | undefined) ??
           94
         );
 
-        const oldAn = (p.old_analysis as any) ?? {};
-        const newAn = (p.new_analysis as any) ?? {};
-
         const dimensions = [
           {
             name: 'Clarity',
-            before: normalizeScore(oldAn.clarity ?? oldAn.metrics?.clarity ?? 85),
-            after: normalizeScore(newAn.clarity ?? newAn.metrics?.clarity ?? 95),
+            before: extractDimScore(oldAn, ['clarity', 'clarity_score'], 85),
+            after: extractDimScore(newAn, ['clarity', 'clarity_score'], 95),
           },
           {
             name: 'Context',
-            before: normalizeScore(oldAn.context ?? oldAn.metrics?.context ?? 40),
-            after: normalizeScore(newAn.context ?? newAn.metrics?.context ?? 100),
+            before: extractDimScore(oldAn, ['context', 'context_score'], 40),
+            after: extractDimScore(newAn, ['context', 'context_score'], 100),
           },
           {
             name: 'Role',
-            before: normalizeScore(oldAn.role ?? oldAn.metrics?.role ?? 10),
-            after: normalizeScore(newAn.role ?? newAn.metrics?.role ?? 100),
+            before: extractDimScore(oldAn, ['role_definition', 'role', 'role_score'], 10),
+            after: extractDimScore(newAn, ['role_definition', 'role', 'role_score'], 100),
           },
           {
             name: 'Format',
-            before: normalizeScore(oldAn.format ?? oldAn.output_structure ?? 30),
-            after: normalizeScore(newAn.format ?? newAn.output_structure ?? 100),
+            before: extractDimScore(oldAn, ['output_format', 'format', 'format_score', 'output_structure'], 30),
+            after: extractDimScore(newAn, ['output_format', 'format', 'format_score', 'output_structure'], 100),
           },
           {
             name: 'Constraints',
-            before: normalizeScore(oldAn.constraints ?? oldAn.metrics?.constraints ?? 20),
-            after: normalizeScore(newAn.constraints ?? newAn.metrics?.constraints ?? 98),
+            before: extractDimScore(oldAn, ['constraints', 'constraints_score'], 20),
+            after: extractDimScore(newAn, ['constraints', 'constraints_score'], 98),
           },
           {
             name: 'Examples',
-            before: normalizeScore(oldAn.examples ?? oldAn.metrics?.examples ?? 0),
-            after: normalizeScore(newAn.examples ?? newAn.metrics?.examples ?? 100),
+            before: extractDimScore(oldAn, ['examples', 'few_shot_examples', 'examples_score'], 0),
+            after: extractDimScore(newAn, ['examples', 'few_shot_examples', 'examples_score'], 100),
           },
         ];
 
@@ -344,4 +344,38 @@ function normalizeCategory(value?: string): PromptCategory {
 function normalizeScore(score: number): number {
   if (!Number.isFinite(score)) return 0;
   return Math.max(0, Math.min(100, score <= 10 ? Math.round(score * 10) : Math.round(score)));
+}
+
+function extractDimScore(analysis: any, keys: string[], fallback: number): number {
+  if (!analysis || typeof analysis !== 'object') return fallback;
+
+  for (const key of keys) {
+    // 1. In analysis.dimensions object (standard backend format: analysis.dimensions.clarity.score or analysis.dimensions.clarity)
+    if (analysis.dimensions && typeof analysis.dimensions === 'object') {
+      const d = analysis.dimensions[key];
+      if (typeof d === 'number') return normalizeScore(d);
+      if (d && typeof d.score === 'number') return normalizeScore(d.score);
+    }
+
+    // 2. In analysis.metrics object
+    if (analysis.metrics && typeof analysis.metrics === 'object') {
+      const m = analysis.metrics[key];
+      if (typeof m === 'number') return normalizeScore(m);
+      if (m && typeof m.score === 'number') return normalizeScore(m.score);
+    }
+
+    // 3. In analysis.scores object
+    if (analysis.scores && typeof analysis.scores === 'object') {
+      const s = analysis.scores[key];
+      if (typeof s === 'number') return normalizeScore(s);
+      if (s && typeof s.score === 'number') return normalizeScore(s.score);
+    }
+
+    // 4. Direct top-level key
+    const direct = analysis[key];
+    if (typeof direct === 'number') return normalizeScore(direct);
+    if (direct && typeof direct.score === 'number') return normalizeScore(direct.score);
+  }
+
+  return fallback;
 }

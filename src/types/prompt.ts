@@ -54,6 +54,7 @@ export interface PromptVersion {
   mode?: EnhancementMode;
   createdAt: number;
   metadata?: Record<string, unknown>;
+  analysisData?: PromptAnalysisData;
 }
 
 export interface PromptHistoryFilters {
