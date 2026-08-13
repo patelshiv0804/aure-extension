@@ -1,5 +1,5 @@
 // ──────────────────────────────────────────────────────────────
-// FloatingEnhanceButton — Premium floating toolbar
+// FloatingEnhanceButton — Premium floating orb capsule
 // ──────────────────────────────────────────────────────────────
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -15,8 +15,8 @@ interface FloatingEnhanceButtonProps {
   onOpenHistory?: () => void;
 }
 
-const BUTTON_HEIGHT = 40;
-const BUTTON_WIDTH = 210;
+const BUTTON_HEIGHT = 36;
+const BUTTON_WIDTH = 175;
 
 export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   adapter,
@@ -25,14 +25,13 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 }) => {
   const { flowState, setFlowState } = useEnhanceStore();
   const [position, setPosition] = useState<{ x: number; y: number; width: number } | null>(null);
+  const [isMainHovered, setIsMainHovered] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
-  // Keep last known valid position so the button doesn't vanish during brief rect misses
   const lastValidPosition = useRef<{ x: number; y: number; width: number } | null>(null);
 
   const computePosition = useCallback(() => {
     const rect = adapter.getInputRect();
 
-    // No rect yet — fall back to last known good position to avoid flickering
     if (!rect || rect.width === 0) {
       if (lastValidPosition.current) {
         setPosition(lastValidPosition.current);
@@ -40,8 +39,6 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       return;
     }
 
-    // Walk up from the input element to find the outer input container
-    // (the full box including action buttons like mic/send).
     const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
     let containerRect = rect;
     if (input) {
@@ -60,16 +57,14 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     }
 
     const x = containerRect.right - BUTTON_WIDTH;
-    const y = containerRect.top - BUTTON_HEIGHT - 4;
+    const y = containerRect.top - BUTTON_HEIGHT - 6;
 
-    // Reject positions that are completely off-screen (avoid invisible placements)
     if (
       x < 0 ||
-      y < -BUTTON_HEIGHT || // allow slightly above viewport for smooth animation
+      y < -BUTTON_HEIGHT ||
       x > window.innerWidth ||
       y > window.innerHeight
     ) {
-      // Off-screen — keep last valid if available
       if (lastValidPosition.current) {
         setPosition(lastValidPosition.current);
       }
@@ -82,13 +77,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   }, [adapter]);
 
   useEffect(() => {
-    // Run immediately
     computePosition();
-
-    // Poll faster (150ms) to catch layout shifts quickly on SPA pages
     const interval = setInterval(computePosition, 150);
-
-    // Also update on scroll / resize
     window.addEventListener('scroll', computePosition, { passive: true });
     window.addEventListener('resize', computePosition, { passive: true });
 
@@ -113,41 +103,46 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     switch (flowState) {
       case 'enhancing':
         return (
-          <>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7C5CFC', fontWeight: 600, fontSize: 12 }}>
             <span className="pe-spinner" style={{ display: 'inline-flex' }}>
-              <RoleIcon name="Loader2" size={18} strokeWidth={2} />
+              <RoleIcon name="Loader2" size={15} strokeWidth={2.2} />
             </span>
-            <span style={{ fontSize: 13.5, fontWeight: 500 }}>Enhancing…</span>
-          </>
+            <span>Enhancing…</span>
+          </div>
         );
       case 'injected':
         return (
-          <>
-            <span style={{ color: '#34D399' }}>
-              <RoleIcon name="Check" size={18} strokeWidth={2.5} />
-            </span>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: '#34D399' }}>Done!</span>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10B981', fontWeight: 700, fontSize: 12 }}>
+            <RoleIcon name="Check" size={15} strokeWidth={2.5} />
+            <span>Done!</span>
+          </div>
         );
       case 'error':
         return (
-          <>
-            <span style={{ color: '#ef4444' }}>
-              <RoleIcon name="X" size={18} strokeWidth={2.5} />
-            </span>
-            <span style={{ fontSize: 13.5, fontWeight: 600, color: '#ef4444' }}>Failed</span>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#EF4444', fontWeight: 700, fontSize: 12 }}>
+            <RoleIcon name="X" size={15} strokeWidth={2.5} />
+            <span>Failed</span>
+          </div>
         );
       default:
         return (
-          <>
-            <img
-              src={chrome.runtime.getURL('logo.png')}
-              alt="AURE"
-              style={{ width: 20, height: 20, objectFit: 'contain' }}
-            />
-            <span style={{ fontSize: 13.5, fontWeight: 700, letterSpacing: '-0.01em' }}>AURE</span>
-          </>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s ease' }}>
+            {isMainHovered ? (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#7C5CFC' }}>
+                <span style={{ color: '#9D7BFF' }}>✦</span> Enhance
+              </span>
+            ) : (
+              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: '#1E1B4B' }}>
+                <img
+                  src={chrome.runtime.getURL('logo.png')}
+                  alt="AURE"
+                  style={{ width: 16, height: 16, objectFit: 'contain' }}
+                />
+                <span style={{ letterSpacing: '-0.02em' }}>AURE</span>
+                <span style={{ color: '#9D7BFF', fontSize: 11, marginLeft: 1 }}>✦</span>
+              </span>
+            )}
+          </div>
         );
     }
   };
@@ -159,9 +154,9 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       <motion.div
         ref={buttonRef}
         key="pe-toolbar"
-        initial={{ opacity: 0, scaleY: 0.8, transformOrigin: 'bottom' }}
-        animate={{ opacity: 1, scaleY: 1 }}
-        exit={{ opacity: 0, scaleY: 0.8 }}
+        initial={{ opacity: 0, y: 4, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, y: 4, scale: 0.95 }}
         transition={{ type: 'spring', stiffness: 500, damping: 30 }}
         style={{
           position: 'fixed',
@@ -170,36 +165,33 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
           zIndex: 2147483647,
           pointerEvents: 'auto',
           display: 'flex',
-          alignItems: 'stretch',
+          alignItems: 'center',
           height: BUTTON_HEIGHT,
-          borderTop: '1px solid #ECE9FF',
-          borderLeft: '1px solid #ECE9FF',
-          borderRight: '1px solid #ECE9FF',
-          borderBottom: 'none',
-          borderRadius: '14px 14px 0 0',
+          padding: '3px 4px 3px 6px',
+          borderRadius: '20px',
           background: '#FFFFFF',
-          overflow: 'hidden',
+          border: '1px solid rgba(236, 233, 255, 0.9)',
+          boxShadow: '0 4px 16px rgba(124, 92, 252, 0.08), 0 2px 6px rgba(0,0,0,0.04)',
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
-          color: '#7C5CFC',
-          boxShadow: '0 -4px 16px rgba(124, 92, 252, 0.08), 0 -1px 3px rgba(0,0,0,0.04)',
+          userSelect: 'none',
         }}
       >
-        {/* Role selector button */}
+        {/* Minimal Mode / Role Icon Button */}
         <button
           onClick={() => setFlowState('selecting')}
-          title="Change enhancement role"
+          title="Mode"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 40,
-            height: '100%',
+            width: 28,
+            height: 28,
+            borderRadius: '14px',
             background: 'transparent',
             border: 'none',
-            borderRight: '1px solid #ECE9FF',
             color: '#A78BFA',
             cursor: 'pointer',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s ease',
             padding: 0,
           }}
           onMouseEnter={(e) => {
@@ -211,26 +203,27 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             e.currentTarget.style.color = '#A78BFA';
           }}
         >
-          <RoleIcon name="SlidersHorizontal" size={18} strokeWidth={1.75} />
+          <RoleIcon name="SlidersHorizontal" size={15} strokeWidth={1.8} />
         </button>
 
-        {/* History button */}
+        {/* Minimal History Icon Button */}
         <button
           onClick={handleHistoryClick}
-          title="View prompt history"
+          title="History"
           style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 40,
-            height: '100%',
+            width: 28,
+            height: 28,
+            borderRadius: '14px',
             background: 'transparent',
             border: 'none',
-            borderRight: '1px solid #ECE9FF',
             color: '#A78BFA',
             cursor: 'pointer',
-            transition: 'all 0.15s',
+            transition: 'all 0.15s ease',
             padding: 0,
+            marginRight: 4,
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.background = '#F5F3FF';
@@ -241,32 +234,29 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             e.currentTarget.style.color = '#A78BFA';
           }}
         >
-          <RoleIcon name="History" size={18} strokeWidth={1.75} />
+          <RoleIcon name="History" size={15} strokeWidth={1.8} />
         </button>
 
-        {/* Enhance button */}
+        {/* Vertical divider */}
+        <div style={{ width: 1, height: 16, background: '#ECE9FF', marginRight: 4 }} />
+
+        {/* Main AURE / Enhance Orb Button */}
         <button
           onClick={onEnhance}
+          onMouseEnter={() => setIsMainHovered(true)}
+          onMouseLeave={() => setIsMainHovered(false)}
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 8,
-            height: '100%',
-            flex: 1,
             justifyContent: 'center',
-            background: 'transparent',
+            height: 28,
+            padding: '0 10px',
+            borderRadius: '14px',
+            background: isMainHovered ? 'linear-gradient(135deg, #F3F0FF, #EDE9FE)' : 'transparent',
             border: 'none',
-            color: '#7C5CFC',
             cursor: 'pointer',
-            transition: 'all 0.15s',
+            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
             whiteSpace: 'nowrap',
-            padding: '0 14px',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#F5F3FF';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
           }}
         >
           {getButtonContent()}
