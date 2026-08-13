@@ -6,6 +6,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
+import { useAuthStore } from '@/stores/auth.store';
 import { sendMessage } from '@/lib/messaging';
 import { RoleIcon } from '../common/RoleIcon';
 
@@ -23,11 +24,27 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   onEnhance,
   onOpenHistory,
 }) => {
-  const { flowState, setFlowState } = useEnhanceStore();
+  const { flowState, setFlowState, error } = useEnhanceStore();
+  const { isAuthenticated, loadAuth } = useAuthStore();
   const [position, setPosition] = useState<{ x: number; y: number; width: number } | null>(null);
   const [isMainHovered, setIsMainHovered] = useState(false);
   const buttonRef = useRef<HTMLDivElement>(null);
   const lastValidPosition = useRef<{ x: number; y: number; width: number } | null>(null);
+
+  useEffect(() => {
+    loadAuth();
+  }, [loadAuth]);
+
+  // Real-time auth sync: clear auth error when user logs in
+  useEffect(() => {
+    if (isAuthenticated) {
+      const errStr = (error || '').toLowerCase();
+      if (flowState === 'error' && (errStr.includes('sign in') || errStr.includes('logged in') || errStr.includes('401'))) {
+        setFlowState('idle');
+        useEnhanceStore.getState().setError(null);
+      }
+    }
+  }, [isAuthenticated, flowState, error, setFlowState]);
 
   const computePosition = useCallback(() => {
     const rect = adapter.getInputRect();
@@ -118,6 +135,22 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
           </div>
         );
       case 'error':
+        const errStr = (error || '').toLowerCase();
+        const isAuthError =
+          errStr.includes('sign in') ||
+          errStr.includes('logged in') ||
+          errStr.includes('401') ||
+          errStr.includes('unauthorized');
+
+        if (isAuthError) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#7C5CFC', fontWeight: 700, fontSize: 11 }}>
+              <RoleIcon name="Lock" size={13} strokeWidth={2.2} />
+              <span>Please Sign In</span>
+            </div>
+          );
+        }
+
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#EF4444', fontWeight: 700, fontSize: 12 }}>
             <RoleIcon name="X" size={15} strokeWidth={2.5} />
@@ -149,6 +182,14 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 
   if (!position) return null;
 
+  const errStr = (error || '').toLowerCase();
+  const isAuthError =
+    flowState === 'error' &&
+    (errStr.includes('sign in') ||
+      errStr.includes('logged in') ||
+      errStr.includes('401') ||
+      errStr.includes('unauthorized'));
+
   return (
     <AnimatePresence>
       <motion.div
@@ -176,6 +217,51 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
           userSelect: 'none',
         }}
       >
+        {/* Floating Notification Banner if user is not logged in */}
+        {isAuthError && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.94 }}
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              marginBottom: 8,
+              right: 0,
+              whiteSpace: 'nowrap',
+              background: '#171A2B',
+              color: '#FFFFFF',
+              padding: '7px 12px',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: 600,
+              boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              zIndex: 2147483647,
+            }}
+          >
+            <span style={{ color: '#F43F5E' }}>⚠️</span>
+            <span>You are not logged in.</span>
+            <button
+              onClick={handleHistoryClick}
+              style={{
+                background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)',
+                color: '#FFFFFF',
+                border: 'none',
+                padding: '3px 9px',
+                borderRadius: '8px',
+                fontSize: '10px',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Sign In Now →
+            </button>
+          </motion.div>
+        )}
+
         {/* Minimal Mode / Role Icon Button */}
         <button
           onClick={() => setFlowState('selecting')}
@@ -242,7 +328,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 
         {/* Main AURE / Enhance Orb Button */}
         <button
-          onClick={onEnhance}
+          onClick={isAuthError ? handleHistoryClick : onEnhance}
           onMouseEnter={() => setIsMainHovered(true)}
           onMouseLeave={() => setIsMainHovered(false)}
           style={{

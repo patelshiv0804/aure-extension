@@ -11,6 +11,8 @@ import { classifyPrompt, getPromptSuggestions } from '@/lib/classifier';
 import { debounce } from '@/lib/debounce';
 import { sendMessage } from '@/lib/messaging';
 import type { EnhancementMode } from '@/types/enhancement';
+import { useAuthStore } from '@/stores/auth.store';
+import { getStorage } from '@/lib/storage';
 import { FloatingEnhanceButton } from './FloatingEnhanceButton';
 import { EnhancementModePanel } from './EnhancementModePanel';
 import { ComparisonPanel } from './ComparisonPanel';
@@ -169,6 +171,21 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     async (mode: EnhancementMode, role?: string, roleMode?: string) => {
       const prompt = adapterRef.current.extractPrompt();
       if (!prompt.trim()) return;
+
+      // Check login status before calling backend API
+      await useAuthStore.getState().loadAuth();
+      const { isAuthenticated, user } = useAuthStore.getState();
+      const cachedProfile = await getStorage('userProfile');
+
+      if (!isAuthenticated && !user && !cachedProfile) {
+        useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
+        setFlowState('error');
+        // Open workspace sidepanel automatically for quick login
+        sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
+        return;
+      }
+
+      useEnhanceStore.getState().setError(null);
 
       setCurrentPrompt(prompt);
       useEnhanceStore.getState().setSelectedMode(mode);

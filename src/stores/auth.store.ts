@@ -3,7 +3,7 @@
 // ──────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
-import { apiRequest } from '@/api/client';
+import { apiRequest, ApiError } from '@/api/client';
 import { getAuthCookie, setAuthCookie, removeAuthCookie } from '@/lib/cookies';
 import { getStorage, setStorage, removeStorage, UserProfile } from '@/lib/storage';
 import { historyCache, enhanceCache } from '@/lib/cache';
@@ -50,6 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
+      // Pre-set authenticated status from cached profile/token immediately for instant UI render
       set({ token, user: cachedProfile || null, isAuthenticated: !!cachedProfile });
 
       // 2. Validate cookie session with backend GET /profile/me
@@ -67,16 +68,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           await setStorage('apiToken', activeCookie);
         }
       } catch (err) {
-        // Session invalid or expired
-        await removeAuthCookie();
-        await removeStorage('userProfile');
-        await removeStorage('currentUserEmail');
-        await removeStorage('promptiq_token');
-        await removeStorage('apiToken');
-        set({ user: null, token: null, isAuthenticated: false });
+        // ONLY wipe session if API explicitly returns 401 Unauthorized
+        if (err instanceof ApiError && err.status === 401) {
+          await removeAuthCookie();
+          await removeStorage('userProfile');
+          await removeStorage('currentUserEmail');
+          await removeStorage('promptiq_token');
+          await removeStorage('apiToken');
+          set({ user: null, token: null, isAuthenticated: false });
+        } else if (cachedProfile) {
+          // Retain authenticated status with cached profile if network error or content script cross-origin fetch restriction
+          set({ user: cachedProfile, token: token || null, isAuthenticated: true });
+        }
       }
     } catch (err) {
-      set({ user: null, token: null, isAuthenticated: false });
+      const cachedProfile = await getStorage('userProfile');
+      if (cachedProfile) {
+        set({ user: cachedProfile, isAuthenticated: true });
+      } else {
+        set({ user: null, token: null, isAuthenticated: false });
+      }
     } finally {
       set({ loading: false });
     }
@@ -241,7 +252,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 }));
 
-// Listen for storage changes across extension views (SidePanel, Options, Popup)
+// Listen for storage changes across extension views (SidePanel, Options, Popup, Content Scripts)
 if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local') {
