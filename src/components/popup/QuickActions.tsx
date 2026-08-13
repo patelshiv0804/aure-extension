@@ -56,7 +56,7 @@ export const QuickActions: React.FC = () => {
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
-            onClick={() => chrome.runtime.openOptionsPage()}
+            onClick={handleOpenSidePanel}
             className="p-3 rounded-xl bg-white border border-slate-200/60 hover:bg-slate-50 transition-colors text-left"
           >
             <span className="text-base mb-1.5 block">⚙️</span>

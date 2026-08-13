@@ -21,7 +21,9 @@ export default defineContentScript({
     'https://chat.deepseek.com/*',
     'https://copilot.microsoft.com/*',
   ],
-  runAt: 'document_idle',
+  // document_end fires as soon as DOM is parsed — no waiting for images/fonts/API calls.
+  // This dramatically reduces the time before the AURE button appears.
+  runAt: 'document_end',
 
   async main(_ctx) {
     // Resolve the site adapter for the current page

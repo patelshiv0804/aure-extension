@@ -11,7 +11,11 @@ import type { Prompt, PromptHistoryFilters } from '@/types/prompt';
 import { MODE_MAP } from '@/constants/modes';
 import { RoleIcon } from '../common/RoleIcon';
 
-export const FullHistory: React.FC = () => {
+interface FullHistoryProps {
+  onSignIn?: () => void;
+}
+
+export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -136,8 +140,8 @@ export const FullHistory: React.FC = () => {
             </p>
           </div>
           <button
-            onClick={() => chrome.runtime.openOptionsPage()}
-            className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all"
+            onClick={() => onSignIn?.()}
+            className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all cursor-pointer"
             style={{ background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)' }}
           >
             Sign In to AURE

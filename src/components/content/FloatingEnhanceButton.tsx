@@ -2,7 +2,7 @@
 // FloatingEnhanceButton — Premium floating toolbar
 // ──────────────────────────────────────────────────────────────
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
@@ -16,6 +16,7 @@ interface FloatingEnhanceButtonProps {
 }
 
 const BUTTON_HEIGHT = 40;
+const BUTTON_WIDTH = 210;
 
 export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   adapter,
@@ -25,51 +26,78 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   const { flowState, setFlowState } = useEnhanceStore();
   const [position, setPosition] = useState<{ x: number; y: number; width: number } | null>(null);
   const buttonRef = useRef<HTMLDivElement>(null);
+  // Keep last known valid position so the button doesn't vanish during brief rect misses
+  const lastValidPosition = useRef<{ x: number; y: number; width: number } | null>(null);
 
-  useEffect(() => {
-    const updatePosition = () => {
-      const rect = adapter.getInputRect();
-      if (rect && rect.width > 0) {
-        // Walk up from the input element to find the outer input container
-        // (the full box including action buttons like mic/send).
-        const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
-        let containerRect = rect;
-        if (input) {
-          let el: HTMLElement | null = input;
-          // Walk up a few levels to find a container that is wider than the text input
-          for (let i = 0; i < 6 && el; i++) {
-            const parent = el.parentElement;
-            if (parent) {
-              const pRect = parent.getBoundingClientRect();
-              // Use the parent if it is wider and still a reasonable container
-              if (pRect.width > containerRect.width * 1.1 && pRect.width < window.innerWidth * 0.9) {
-                containerRect = pRect;
-                break;
-              }
-            }
-            el = parent;
+  const computePosition = useCallback(() => {
+    const rect = adapter.getInputRect();
+
+    // No rect yet — fall back to last known good position to avoid flickering
+    if (!rect || rect.width === 0) {
+      if (lastValidPosition.current) {
+        setPosition(lastValidPosition.current);
+      }
+      return;
+    }
+
+    // Walk up from the input element to find the outer input container
+    // (the full box including action buttons like mic/send).
+    const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
+    let containerRect = rect;
+    if (input) {
+      let el: HTMLElement | null = input;
+      for (let i = 0; i < 6 && el; i++) {
+        const parent = el.parentElement;
+        if (parent) {
+          const pRect = parent.getBoundingClientRect();
+          if (pRect.width > containerRect.width * 1.1 && pRect.width < window.innerWidth * 0.9) {
+            containerRect = pRect;
+            break;
           }
         }
-        const buttonWidth = 210;
-        setPosition({
-          x: containerRect.right - buttonWidth,
-          y: containerRect.top - BUTTON_HEIGHT - 4,
-          width: buttonWidth,
-        });
+        el = parent;
       }
-    };
+    }
 
-    updatePosition();
-    const interval = setInterval(updatePosition, 400);
-    window.addEventListener('scroll', updatePosition, { passive: true });
-    window.addEventListener('resize', updatePosition, { passive: true });
+    const x = containerRect.right - BUTTON_WIDTH;
+    const y = containerRect.top - BUTTON_HEIGHT - 4;
+
+    // Reject positions that are completely off-screen (avoid invisible placements)
+    if (
+      x < 0 ||
+      y < -BUTTON_HEIGHT || // allow slightly above viewport for smooth animation
+      x > window.innerWidth ||
+      y > window.innerHeight
+    ) {
+      // Off-screen — keep last valid if available
+      if (lastValidPosition.current) {
+        setPosition(lastValidPosition.current);
+      }
+      return;
+    }
+
+    const next = { x, y, width: BUTTON_WIDTH };
+    lastValidPosition.current = next;
+    setPosition(next);
+  }, [adapter]);
+
+  useEffect(() => {
+    // Run immediately
+    computePosition();
+
+    // Poll faster (150ms) to catch layout shifts quickly on SPA pages
+    const interval = setInterval(computePosition, 150);
+
+    // Also update on scroll / resize
+    window.addEventListener('scroll', computePosition, { passive: true });
+    window.addEventListener('resize', computePosition, { passive: true });
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('scroll', updatePosition);
-      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', computePosition);
+      window.removeEventListener('resize', computePosition);
     };
-  }, [adapter]);
+  }, [computePosition]);
 
   const handleHistoryClick = () => {
     if (onOpenHistory) {
@@ -247,4 +275,3 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     </AnimatePresence>
   );
 };
-

@@ -65,22 +65,39 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   useEffect(() => {
     const currentAdapter = adapterRef.current;
 
-    currentAdapter.observeChanges((input: HTMLElement) => {
+    // Keep track of cleanup functions for event listeners per input
+    let cleanupListeners: (() => void) | null = null;
+
+    const attachToInput = (input: HTMLElement) => {
+      // Remove listeners from previous input before attaching to new one
+      if (cleanupListeners) {
+        cleanupListeners();
+        cleanupListeners = null;
+      }
+
       setActiveInput(input);
 
-      // Show button on input focus
       const handleFocus = () => {
         setShowButton(true);
         handlePromptChange();
       };
 
       const handleBlur = () => {
-        // Delay hide to allow clicking the enhance button
+        // Use a longer delay (350ms) to give enough time for:
+        // 1. Click events on the AURE button to register (mousedown fires before blur)
+        // 2. Focus to transfer from input → AURE button element
         setTimeout(() => {
-          if (!document.activeElement?.closest?.('#pe-app')) {
+          const active = document.activeElement;
+          // Keep button visible if focus moved to the AURE toolbar or any of its children
+          const insidePeApp = active?.closest?.('#pe-app');
+          // Also keep visible if a button/element inside the AURE button is hovered
+          const peToolbar = document.querySelector('#pe-app');
+          const isHoveringAure = peToolbar?.matches?.(':hover') ?? false;
+
+          if (!insidePeApp && !isHoveringAure) {
             setShowButton(false);
           }
-        }, 200);
+        }, 350);
       };
 
       const handleInput = () => {
@@ -96,15 +113,20 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         handleFocus();
       }
 
-      return () => {
+      cleanupListeners = () => {
         input.removeEventListener('focus', handleFocus);
         input.removeEventListener('blur', handleBlur);
         input.removeEventListener('input', handleInput);
       };
-    });
+    };
+
+    currentAdapter.observeChanges(attachToInput);
 
     return () => {
       currentAdapter.disconnect();
+      if (cleanupListeners) {
+        cleanupListeners();
+      }
     };
   }, [setActiveInput, setShowButton, handlePromptChange]);
 

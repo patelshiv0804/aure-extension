@@ -48,10 +48,6 @@ export default defineConfig({
         matches: ['*://*/*'],
       },
     ],
-    options_ui: {
-      page: 'options.html',
-      open_in_tab: true,
-    },
   },
   vite: () => ({
     build: {

@@ -40,37 +40,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       // 1. Try to read token from HTTP Cookie or chrome.storage.local
       const cookieToken = await getAuthCookie();
-      const storageToken = await getStorage('promptiq_token') || await getStorage('apiToken');
-      const token = cookieToken || storageToken;
+      const storageToken = (await getStorage('promptiq_token')) || (await getStorage('apiToken'));
+      const token = cookieToken || storageToken || null;
       const cachedProfile = await getStorage('userProfile');
 
-      if (token) {
-        set({ token, user: cachedProfile || null, isAuthenticated: true });
-        try {
-          const profile = await apiRequest<UserProfile>({
-            method: 'GET',
-            path: '/profile/me',
-          });
-          set({ user: profile, isAuthenticated: true });
-          await setStorage('userProfile', profile);
-          if (profile.email) await setStorage('currentUserEmail', profile.email);
-          await setStorage('promptiq_token', token);
-          await setStorage('apiToken', token);
-        } catch (err) {
-          console.warn('[AURE] Failed to validate cookie token with profile/me:', err);
-          // Token expired or invalid
-          await removeAuthCookie();
-          await removeStorage('userProfile');
-          await removeStorage('currentUserEmail');
-          await removeStorage('promptiq_token');
-          await removeStorage('apiToken');
-          set({ user: null, token: null, isAuthenticated: false });
+      // If no token or cached profile is present, user is not signed in
+      if (!token && !cachedProfile) {
+        set({ user: null, token: null, isAuthenticated: false });
+        return;
+      }
+
+      set({ token, user: cachedProfile || null, isAuthenticated: !!cachedProfile });
+
+      // 2. Validate cookie session with backend GET /profile/me
+      try {
+        const profile = await apiRequest<UserProfile>({
+          method: 'GET',
+          path: '/profile/me',
+        });
+        const activeCookie = (await getAuthCookie()) || token;
+        set({ user: profile, token: activeCookie, isAuthenticated: true });
+        await setStorage('userProfile', profile);
+        if (profile.email) await setStorage('currentUserEmail', profile.email);
+        if (activeCookie) {
+          await setStorage('promptiq_token', activeCookie);
+          await setStorage('apiToken', activeCookie);
         }
-      } else {
+      } catch (err) {
+        // Session invalid or expired
+        await removeAuthCookie();
+        await removeStorage('userProfile');
+        await removeStorage('currentUserEmail');
+        await removeStorage('promptiq_token');
+        await removeStorage('apiToken');
         set({ user: null, token: null, isAuthenticated: false });
       }
     } catch (err) {
-      console.error('[AURE] Auth load failed:', err);
       set({ user: null, token: null, isAuthenticated: false });
     } finally {
       set({ loading: false });
@@ -84,22 +89,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       formData.append('username', email);
       formData.append('password', password);
 
-      const response = await apiRequest<{ access_token: string }>({
+      const response = await apiRequest<{ access_token?: string }>({
         method: 'POST',
         path: '/auth/login',
         body: formData,
       });
 
-      const accessToken = response.access_token;
-      if (!accessToken) throw new Error('No access token returned from backend.');
+      // Retrieve HTTP cookie set automatically by backend response
+      const cookieToken = await getAuthCookie();
+      const accessToken = response.access_token || cookieToken || '';
 
-      // Save token in HTTP Cookie and Chrome Storage
-      await setAuthCookie(accessToken);
-      await setStorage('promptiq_token', accessToken);
-      await setStorage('apiToken', accessToken);
-      set({ token: accessToken });
+      if (accessToken) {
+        await setAuthCookie(accessToken);
+        await setStorage('promptiq_token', accessToken);
+        await setStorage('apiToken', accessToken);
+        set({ token: accessToken });
+      }
 
-      // Fetch user profile
+      // Fetch user profile using HTTP cookie credentials
       const profile = await apiRequest<UserProfile>({
         method: 'GET',
         path: '/profile/me',
@@ -134,7 +141,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         },
       });
 
-      // Auto login after registration
+      // Auto login after registration to set HTTP cookie session
       await get().login(email, password);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed';
@@ -148,19 +155,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithGoogle: async (idToken: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await apiRequest<{ access_token: string }>({
+      const response = await apiRequest<{ access_token?: string }>({
         method: 'POST',
         path: '/auth/google',
         body: { id_token: idToken },
       });
 
-      const accessToken = response.access_token;
-      if (!accessToken) throw new Error('No access token returned from Google authentication.');
+      const cookieToken = await getAuthCookie();
+      const accessToken = response.access_token || cookieToken || '';
 
-      await setAuthCookie(accessToken);
-      await setStorage('promptiq_token', accessToken);
-      await setStorage('apiToken', accessToken);
-      set({ token: accessToken });
+      if (accessToken) {
+        await setAuthCookie(accessToken);
+        await setStorage('promptiq_token', accessToken);
+        await setStorage('apiToken', accessToken);
+        set({ token: accessToken });
+      }
 
       const profile = await apiRequest<UserProfile>({
         method: 'GET',
@@ -213,6 +222,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   logout: async () => {
     set({ loading: true });
     try {
+      await apiRequest({
+        method: 'POST',
+        path: '/auth/logout',
+      });
+    } catch (err) {
+      console.warn('[AURE] Logout API failed:', err);
+    } finally {
       await removeAuthCookie();
       await removeStorage('userProfile');
       await removeStorage('currentUserEmail');
@@ -220,7 +236,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await removeStorage('apiToken');
       historyCache.clear();
       enhanceCache.clear();
-    } finally {
       set({ user: null, token: null, isAuthenticated: false, loading: false, error: null });
     }
   },

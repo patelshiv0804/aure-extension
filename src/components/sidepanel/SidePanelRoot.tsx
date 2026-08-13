@@ -8,12 +8,14 @@ import { useSettingsStore } from '@/stores/settings.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { FullHistory } from './FullHistory';
 import { Analytics } from './Analytics';
+import { AuthView } from '../auth/AuthView';
 import { RoleIcon } from '../common/RoleIcon';
 
 type SidePanelTab = 'history' | 'analytics';
 
 export const SidePanelRoot: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SidePanelTab>('history');
+  const [showAuthView, setShowAuthView] = useState(false);
   const { loadSettings } = useSettingsStore();
   const { user, isAuthenticated, loadAuth, logout } = useAuthStore();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
@@ -36,6 +38,13 @@ export const SidePanelRoot: React.FC = () => {
       return () => chrome.storage.onChanged.removeListener(handleStorageChange);
     }
   }, [loadSettings, loadAuth]);
+
+  // Reset showAuthView once user successfully logs in
+  useEffect(() => {
+    if (isAuthenticated) {
+      setShowAuthView(false);
+    }
+  }, [isAuthenticated]);
 
   const tabs: Array<{ id: SidePanelTab; label: string; icon: string }> = [
     { id: 'history', label: 'History', icon: 'Clock' },
@@ -74,7 +83,7 @@ export const SidePanelRoot: React.FC = () => {
               <div className="relative">
                 <div className="flex items-center gap-1.5">
                   <button
-                    onClick={() => chrome.runtime.openOptionsPage()}
+                    onClick={() => setShowAuthView(!showAuthView)}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-600 border border-primary-200/60 hover:bg-primary-100/70 transition-all text-xs font-semibold shadow-2xs"
                     title={user.email}
                   >
@@ -139,73 +148,92 @@ export const SidePanelRoot: React.FC = () => {
               </div>
             ) : (
               <button
-                onClick={() => chrome.runtime.openOptionsPage()}
-                className="px-3 py-1 rounded-full bg-primary-500 hover:bg-primary-600 text-white text-[11px] font-bold shadow-sm transition-all"
+                onClick={() => setShowAuthView(!showAuthView)}
+                className={`px-3 py-1 rounded-full text-[11px] font-bold shadow-sm transition-all ${
+                  showAuthView
+                    ? 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+                    : 'bg-primary-500 hover:bg-primary-600 text-white'
+                }`}
               >
-                Sign In
+                {showAuthView ? 'Back' : 'Sign In'}
               </button>
             )}
           </div>
         </div>
 
-        {/* Segmented Control */}
-        <div className="px-5 pb-3">
-          <div
-            className="flex rounded-xl p-1"
-            style={{
-              background: '#F0EDF9',
-              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
-            }}
-          >
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all duration-200"
-                style={{
-                  fontSize: 13,
-                  fontWeight: activeTab === tab.id ? 600 : 500,
-                  color: activeTab === tab.id ? '#1a1a2e' : '#8E8EA0',
-                  background: 'transparent',
-                  border: 'none',
-                  cursor: 'pointer',
-                  position: 'relative',
-                  zIndex: 1,
-                }}
-              >
-                {activeTab === tab.id && (
-                  <motion.div
-                    layoutId="segmentedTab"
-                    className="absolute inset-0 rounded-lg"
-                    style={{
-                      background: '#FFFFFF',
-                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                      zIndex: -1,
-                    }}
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-                  />
-                )}
-                <RoleIcon name={tab.icon} size={14} strokeWidth={activeTab === tab.id ? 2 : 1.75} />
-                {tab.label}
-              </button>
-            ))}
+        {/* Segmented Control (only when not showing AuthView) */}
+        {!showAuthView && (
+          <div className="px-5 pb-3">
+            <div
+              className="flex rounded-xl p-1"
+              style={{
+                background: '#F0EDF9',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.04)',
+              }}
+            >
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg transition-all duration-200"
+                  style={{
+                    fontSize: 13,
+                    fontWeight: activeTab === tab.id ? 600 : 500,
+                    color: activeTab === tab.id ? '#1a1a2e' : '#8E8EA0',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    zIndex: 1,
+                  }}
+                >
+                  {activeTab === tab.id && (
+                    <motion.div
+                      layoutId="segmentedTab"
+                      className="absolute inset-0 rounded-lg"
+                      style={{
+                        background: '#FFFFFF',
+                        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                        zIndex: -1,
+                      }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                    />
+                  )}
+                  <RoleIcon name={tab.icon} size={14} strokeWidth={activeTab === tab.id ? 2 : 1.75} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── Content ────────────────────────────────────────── */}
       <div className="flex-1 overflow-auto">
         <AnimatePresence mode="wait">
-          <motion.div
-            key={activeTab}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.15 }}
-          >
-            {activeTab === 'history' && <FullHistory />}
-            {activeTab === 'analytics' && <Analytics />}
-          </motion.div>
+          {showAuthView && !isAuthenticated ? (
+            <motion.div
+              key="auth-view"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+              className="p-4"
+            >
+              <AuthView />
+            </motion.div>
+          ) : (
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.15 }}
+            >
+              {activeTab === 'history' && <FullHistory onSignIn={() => setShowAuthView(true)} />}
+              {activeTab === 'analytics' && <Analytics />}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
     </div>

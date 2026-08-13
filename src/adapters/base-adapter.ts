@@ -15,6 +15,7 @@ export abstract class BaseAdapter implements SiteAdapter {
   protected currentInput: HTMLElement | null = null;
   protected urlCheckInterval: ReturnType<typeof setInterval> | null = null;
   private lastUrl = '';
+  private popstateHandler: (() => void) | null = null;
 
   constructor(config: SiteConfig) {
     this.config = config;
@@ -24,12 +25,20 @@ export abstract class BaseAdapter implements SiteAdapter {
    * Detect the prompt input element using configured selectors.
    */
   detectInput(): HTMLElement | null {
-    if (this.currentInput && this.currentInput.isConnected && this.isVisible(this.currentInput)) {
-      return this.currentInput;
+    // Validate cached input is still connected, visible and non-zero sized
+    if (this.currentInput) {
+      const rect = this.currentInput.getBoundingClientRect();
+      if (
+        this.currentInput.isConnected &&
+        this.isVisible(this.currentInput) &&
+        rect.width > 0 &&
+        rect.height > 0
+      ) {
+        return this.currentInput;
+      }
+      // Cache is stale — clear it so we re-detect below
+      this.currentInput = null;
     }
-
-    // Clear stale ref
-    this.currentInput = null;
 
     for (const selector of this.config.selectors) {
       try {
@@ -101,12 +110,29 @@ export abstract class BaseAdapter implements SiteAdapter {
   observeChanges(callback: (input: HTMLElement) => void): void {
     this.disconnect();
 
-    const debouncedDetect = debounce(() => {
+    // Track last reported input to avoid calling callback repeatedly for same element
+    let lastReportedInput: HTMLElement | null = null;
+
+    const tryDetect = () => {
       const input = this.detectInput();
-      if (input) {
+      if (input && input !== lastReportedInput) {
+        lastReportedInput = input;
         callback(input);
       }
-    }, 50);
+    };
+
+    const debouncedDetect = debounce(tryDetect, 50);
+
+    // ── Instant first pass (synchronous, no delay) ────────────────────────────
+    // Runs immediately — catches the input if DOM is already rendered when the
+    // content script fires (document_end ensures DOM is parsed at this point).
+    tryDetect();
+
+    // ── Progressive retry for SPAs that render the input progressively ────────
+    // Schedules short checks so we find the input as soon as it appears,
+    // without waiting for a MutationObserver tick or the full page to settle.
+    const retryDelays = [100, 300, 700, 1500, 3000];
+    retryDelays.forEach((delay) => setTimeout(tryDetect, delay));
 
     // MutationObserver for dynamically added input elements
     this.observer = new MutationObserver((mutations) => {
@@ -143,18 +169,24 @@ export abstract class BaseAdapter implements SiteAdapter {
     this.urlCheckInterval = setInterval(() => {
       if (location.href !== this.lastUrl) {
         this.lastUrl = location.href;
-        // Re-detect after SPA navigation
-        setTimeout(() => debouncedDetect(), 500);
+        // Clear stale cache immediately on navigation
+        this.currentInput = null;
+        lastReportedInput = null;
+        // Progressive re-detect after SPA navigation
+        [0, 200, 500, 1000].forEach((delay) => setTimeout(tryDetect, delay));
       }
-    }, 1000);
+    }, 500);
 
     // Listen for popstate (back/forward navigation)
-    window.addEventListener('popstate', () => {
-      setTimeout(() => debouncedDetect(), 500);
-    });
-
-    // Initial detection
-    debouncedDetect();
+    if (this.popstateHandler) {
+      window.removeEventListener('popstate', this.popstateHandler);
+    }
+    this.popstateHandler = () => {
+      this.currentInput = null;
+      lastReportedInput = null;
+      [0, 200, 500, 1000].forEach((delay) => setTimeout(tryDetect, delay));
+    };
+    window.addEventListener('popstate', this.popstateHandler);
   }
 
   /**
@@ -169,6 +201,11 @@ export abstract class BaseAdapter implements SiteAdapter {
       clearInterval(this.urlCheckInterval);
       this.urlCheckInterval = null;
     }
+    if (this.popstateHandler) {
+      window.removeEventListener('popstate', this.popstateHandler);
+      this.popstateHandler = null;
+    }
+    this.currentInput = null;
   }
 
   /**
