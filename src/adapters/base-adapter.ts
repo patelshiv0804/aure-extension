@@ -118,41 +118,34 @@ export abstract class BaseAdapter implements SiteAdapter {
       if (input && input !== lastReportedInput) {
         lastReportedInput = input;
         callback(input);
+        // Input found — but keep observer running so we detect
+        // input replacement on SPA navigation or re-render.
       }
     };
 
-    const debouncedDetect = debounce(tryDetect, 50);
+    // Debounce at 200ms to avoid hammering during streaming / rapid DOM mutations
+    const debouncedDetect = debounce(tryDetect, 200);
 
     // ── Instant first pass (synchronous, no delay) ────────────────────────────
-    // Runs immediately — catches the input if DOM is already rendered when the
-    // content script fires (document_end ensures DOM is parsed at this point).
     tryDetect();
 
-    // ── Progressive retry for SPAs that render the input progressively ────────
-    // Schedules short checks so we find the input as soon as it appears,
-    // without waiting for a MutationObserver tick or the full page to settle.
-    const retryDelays = [100, 300, 700, 1500, 3000];
-    retryDelays.forEach((delay) => setTimeout(tryDetect, delay));
+    // ── Tight progressive retry: catches input within 50–800ms of page load ──
+    // Short delays ensure button appears immediately without any user interaction.
+    [50, 150, 400, 800, 1500].forEach((delay) => setTimeout(tryDetect, delay));
 
-    // MutationObserver for dynamically added input elements
+    // MutationObserver — only watch childList, no attribute observation.
+    // Attribute changes (class, style) fire hundreds of times per second
+    // during ChatGPT streaming and cause severe scroll lag.
     this.observer = new MutationObserver((mutations) => {
-      let shouldCheck = false;
       for (const mutation of mutations) {
         if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-          shouldCheck = true;
-          break;
+          debouncedDetect();
+          return;
         }
-        if (mutation.type === 'attributes') {
-          shouldCheck = true;
-          break;
-        }
-      }
-      if (shouldCheck) {
-        debouncedDetect();
       }
     });
 
-    // Observe the container or body
+    // Observe the container or body — childList+subtree only, no attributes
     const container = this.config.containerSelector
       ? document.querySelector(this.config.containerSelector) ?? document.body
       : document.body;
@@ -160,22 +153,36 @@ export abstract class BaseAdapter implements SiteAdapter {
     this.observer.observe(container, {
       childList: true,
       subtree: true,
-      attributes: true,
-      attributeFilter: ['class', 'style', 'hidden', 'aria-hidden'],
     });
 
-    // SPA navigation detection (URL changes without page reload)
+    // ── SPA navigation detection via pushState/replaceState hooks ─────────────
+    // Replaces the 500ms setInterval poll with zero-cost event hooks.
     this.lastUrl = location.href;
-    this.urlCheckInterval = setInterval(() => {
-      if (location.href !== this.lastUrl) {
-        this.lastUrl = location.href;
-        // Clear stale cache immediately on navigation
+    const onNavigate = () => {
+      const newUrl = location.href;
+      if (newUrl !== this.lastUrl) {
+        this.lastUrl = newUrl;
         this.currentInput = null;
         lastReportedInput = null;
-        // Progressive re-detect after SPA navigation
-        [0, 200, 500, 1000].forEach((delay) => setTimeout(tryDetect, delay));
+        // Re-attach observer for new page
+        if (this.observer) {
+          try { this.observer.observe(container, { childList: true, subtree: true }); } catch {}
+        }
+        [0, 100, 300, 700].forEach((delay) => setTimeout(tryDetect, delay));
       }
-    }, 500);
+    };
+
+    // Patch history methods to detect SPA pushState navigation
+    const origPushState = history.pushState.bind(history);
+    const origReplaceState = history.replaceState.bind(history);
+    (history as any).pushState = function(...args: Parameters<typeof history.pushState>) {
+      origPushState(...args);
+      onNavigate();
+    };
+    (history as any).replaceState = function(...args: Parameters<typeof history.replaceState>) {
+      origReplaceState(...args);
+      onNavigate();
+    };
 
     // Listen for popstate (back/forward navigation)
     if (this.popstateHandler) {
@@ -184,9 +191,16 @@ export abstract class BaseAdapter implements SiteAdapter {
     this.popstateHandler = () => {
       this.currentInput = null;
       lastReportedInput = null;
-      [0, 200, 500, 1000].forEach((delay) => setTimeout(tryDetect, delay));
+      if (this.observer) {
+        try { this.observer.observe(container, { childList: true, subtree: true }); } catch {}
+      }
+      [0, 100, 300, 700].forEach((delay) => setTimeout(tryDetect, delay));
     };
     window.addEventListener('popstate', this.popstateHandler);
+
+    // Store restore functions for disconnect()
+    (this as any)._origPushState = origPushState;
+    (this as any)._origReplaceState = origReplaceState;
   }
 
   /**
@@ -204,6 +218,15 @@ export abstract class BaseAdapter implements SiteAdapter {
     if (this.popstateHandler) {
       window.removeEventListener('popstate', this.popstateHandler);
       this.popstateHandler = null;
+    }
+    // Restore patched history methods if we replaced them
+    if ((this as any)._origPushState) {
+      history.pushState = (this as any)._origPushState;
+      (this as any)._origPushState = null;
+    }
+    if ((this as any)._origReplaceState) {
+      history.replaceState = (this as any)._origReplaceState;
+      (this as any)._origReplaceState = null;
     }
     this.currentInput = null;
   }
@@ -322,14 +345,7 @@ export abstract class BaseAdapter implements SiteAdapter {
 
   protected isVisible(el: HTMLElement): boolean {
     const rect = el.getBoundingClientRect();
-    const style = window.getComputedStyle(el);
-    return (
-      rect.width > 0 &&
-      rect.height > 0 &&
-      style.display !== 'none' &&
-      style.visibility !== 'hidden' &&
-      style.opacity !== '0'
-    );
+    return rect.width > 0 && rect.height > 0;
   }
 }
 

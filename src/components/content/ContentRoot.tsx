@@ -16,7 +16,6 @@ import { getStorage } from '@/lib/storage';
 import { FloatingEnhanceButton } from './FloatingEnhanceButton';
 import { EnhancementModePanel } from './EnhancementModePanel';
 import { ComparisonPanel } from './ComparisonPanel';
-import { InlineSuggestions } from './InlineSuggestions';
 import { ModelRecommendation } from './ModelRecommendation';
 import { EnhancedBadge } from './EnhancedBadge';
 
@@ -79,46 +78,34 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
       setActiveInput(input);
 
-      const handleFocus = () => {
-        setShowButton(true);
-        handlePromptChange();
-      };
+      // ── Show button IMMEDIATELY when input is detected ────────────────────
+      // This is the key fix: do NOT wait for focus. Show as soon as we know
+      // the textarea exists on the page, exactly like Promptive Sentry does.
+      setShowButton(true);
+      handlePromptChange();
 
-      const handleBlur = () => {
-        // Use a longer delay (350ms) to give enough time for:
-        // 1. Click events on the AURE button to register (mousedown fires before blur)
-        // 2. Focus to transfer from input → AURE button element
-        setTimeout(() => {
-          const active = document.activeElement;
-          // Keep button visible if focus moved to the AURE toolbar or any of its children
-          const insidePeApp = active?.closest?.('#pe-app');
-          // Also keep visible if a button/element inside the AURE button is hovered
-          const peToolbar = document.querySelector('#pe-app');
-          const isHoveringAure = peToolbar?.matches?.(':hover') ?? false;
-
-          if (!insidePeApp && !isHoveringAure) {
-            setShowButton(false);
-          }
-        }, 350);
-      };
+      // ── IntersectionObserver: hide/show as input enters/leaves viewport ──
+      let intersectionObserver: IntersectionObserver | null = null;
+      if (typeof IntersectionObserver !== 'undefined') {
+        intersectionObserver = new IntersectionObserver(
+          ([entry]) => {
+            // Show when textarea is in view, hide when scrolled out
+            setShowButton(entry.isIntersecting);
+          },
+          { threshold: 0.1 }
+        );
+        intersectionObserver.observe(input);
+      }
 
       const handleInput = () => {
         handlePromptChange();
       };
 
-      input.addEventListener('focus', handleFocus);
-      input.addEventListener('blur', handleBlur);
       input.addEventListener('input', handleInput);
 
-      // Auto-show if already focused
-      if (document.activeElement === input) {
-        handleFocus();
-      }
-
       cleanupListeners = () => {
-        input.removeEventListener('focus', handleFocus);
-        input.removeEventListener('blur', handleBlur);
         input.removeEventListener('input', handleInput);
+        intersectionObserver?.disconnect();
       };
     };
 
@@ -170,7 +157,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const triggerEnhance = useCallback(
     async (mode: EnhancementMode, role?: string, roleMode?: string) => {
       const prompt = adapterRef.current.extractPrompt();
-      if (!prompt.trim()) return;
+      if (!prompt.trim()) {
+        useEnhanceStore.getState().setError('Please enter a prompt first.');
+        setFlowState('error');
+        setTimeout(() => {
+          if (useEnhanceStore.getState().flowState === 'error') {
+            useEnhanceStore.getState().reset();
+          }
+        }, 3000);
+        return;
+      }
 
       // Check login status before calling backend API
       await useAuthStore.getState().loadAuth();
@@ -233,11 +229,20 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
   const handleEnhanceClick = useCallback(() => {
     const prompt = adapterRef.current.extractPrompt();
-    if (!prompt.trim()) return;
+    if (!prompt.trim()) {
+      useEnhanceStore.getState().setError('Please enter a prompt first.');
+      setFlowState('error');
+      setTimeout(() => {
+        if (useEnhanceStore.getState().flowState === 'error') {
+          useEnhanceStore.getState().reset();
+        }
+      }, 3000);
+      return;
+    }
 
     const classification = classifyPrompt(prompt);
     triggerEnhance(classification.enhancementMode);
-  }, [triggerEnhance]);
+  }, [triggerEnhance, setFlowState]);
 
   const handleOpenHistory = useCallback(() => {
     sendMessage('OPEN_SIDE_PANEL', undefined).catch((err) => {
@@ -303,11 +308,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           onAccept={handleInjectPrompt}
           onReject={handleUndo}
         />
-      )}
-
-      {/* Inline Suggestions */}
-      {showButton && flowState === 'idle' && (
-        <InlineSuggestions adapter={adapter} />
       )}
 
       {/* Model Recommendation & Top-Right Score Card */}

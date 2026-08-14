@@ -48,6 +48,8 @@ import {
   RotateCcw,
   RefreshCw,
   Loader2,
+  GripHorizontal,
+  Move,
 
   // Domain icons
   Bot,
@@ -135,6 +137,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   RotateCcw,
   RefreshCw,
   Loader2,
+  GripHorizontal,
+  Move,
 
   // Domain
   Bot,

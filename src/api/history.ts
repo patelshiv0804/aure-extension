@@ -297,6 +297,24 @@ export async function getPromptHistory(
   return result;
 }
 
+/**
+ * Hard delete a prompt permanently by ID.
+ */
+export async function deletePrompt(promptId: string): Promise<boolean> {
+  try {
+    await apiRequest({
+      method: 'DELETE',
+      path: `/prompts/${promptId}`,
+      rateLimitKey: 'history',
+    });
+    historyCache.clear();
+    return true;
+  } catch (error) {
+    console.error(`[AURE] Failed to hard delete prompt ${promptId}:`, error);
+    throw error;
+  }
+}
+
 function normalizeMode(value?: string): EnhancementMode {
   const mode = value?.toLowerCase().trim();
   const modes: EnhancementMode[] = [

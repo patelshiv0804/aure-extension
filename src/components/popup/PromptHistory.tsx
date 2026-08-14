@@ -14,6 +14,21 @@ export const PromptHistory: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [timeFilter, setTimeFilter] = useState<PromptHistoryFilters['timeRange']>('all');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+
+  const handleDeletePrompt = async (promptId: string) => {
+    setIsDeletingId(promptId);
+    try {
+      await sendMessage('DELETE_PROMPT', { promptId });
+      setPrompts((prev) => prev.filter((p) => p.id !== promptId));
+      setDeleteConfirmId(null);
+    } catch (error) {
+      console.error('[AURE] Failed to hard delete prompt in popup:', error);
+    } finally {
+      setIsDeletingId(null);
+    }
+  };
 
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
@@ -52,7 +67,7 @@ export const PromptHistory: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full relative">
       {/* Search */}
       <div className="px-4 pt-3 pb-2">
         <input
@@ -112,9 +127,9 @@ export const PromptHistory: React.FC = () => {
                   initial={{ opacity: 0, y: 4 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.03 }}
-                  className="p-2.5 rounded-lg bg-white border border-slate-200/60 hover:bg-slate-50/50 transition-colors cursor-pointer group"
+                  className="p-2.5 rounded-lg bg-white border border-slate-200/60 hover:bg-slate-50/50 transition-colors cursor-pointer group flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-start gap-2">
+                  <div className="flex items-start gap-2 flex-1 min-w-0">
                     <div
                       className="w-6 h-6 rounded-md flex items-center justify-center text-[10px] flex-shrink-0 mt-0.5"
                       style={{
@@ -143,7 +158,7 @@ export const PromptHistory: React.FC = () => {
                         {prompt.successScore && (
                           <>
                             <span className="text-[10px] text-slate-900/10">•</span>
-                            <span className="text-[10px] text-success-500/60">
+                            <span className="text-[10px] text-emerald-600 font-semibold">
                               {prompt.successScore}%
                             </span>
                           </>
@@ -151,12 +166,75 @@ export const PromptHistory: React.FC = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Delete Button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteConfirmId(prompt.id);
+                    }}
+                    title="Permanently Delete Prompt"
+                    className="p-1.5 rounded-md text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors opacity-80 hover:opacity-100 shrink-0"
+                  >
+                    <RoleIcon name="Trash2" size={13} />
+                  </button>
                 </motion.div>
               );
             })}
           </div>
         )}
       </div>
+
+      {/* Permanent Hard Delete Confirmation Overlay */}
+      {deleteConfirmId && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+          onClick={() => setDeleteConfirmId(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-[280px] bg-white rounded-xl p-4 border border-rose-100 shadow-2xl space-y-3 font-sans"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100">
+                <RoleIcon name="Trash2" size={16} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">Delete Prompt?</h4>
+                <p className="text-[10px] text-slate-500">Are you sure you want to delete this prompt?</p>
+              </div>
+            </div>
+
+            <div className="text-[10px] text-rose-700 bg-rose-50/80 p-2 rounded-lg border border-rose-100/80 leading-tight">
+              ⚠️ This will permanently hard delete this prompt from the database.
+            </div>
+
+            <div className="flex items-center gap-2 pt-0.5">
+              <button
+                onClick={() => setDeleteConfirmId(null)}
+                disabled={isDeletingId !== null}
+                className="flex-1 py-1.5 px-2 rounded-lg border border-slate-200 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deleteConfirmId && handleDeletePrompt(deleteConfirmId)}
+                disabled={isDeletingId !== null}
+                className="flex-1 py-1.5 px-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold shadow-xs transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+              >
+                {isDeletingId === deleteConfirmId ? (
+                  <>
+                    <RoleIcon name="Loader2" size={12} className="animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <span>Delete</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

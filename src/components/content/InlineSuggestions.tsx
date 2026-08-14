@@ -2,7 +2,7 @@
 // InlineSuggestions — Premium context-aware suggestions
 // ──────────────────────────────────────────────────────────────
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
@@ -31,11 +31,26 @@ const AURE_TOOLBAR_HEIGHT = 44;
 
 export const InlineSuggestions: React.FC<InlineSuggestionsProps> = ({ adapter }) => {
   const { suggestions, currentPrompt, setCurrentPrompt } = useEnhanceStore();
+  const [inputRect, setInputRect] = useState<DOMRect | null>(null);
+  const [isDismissed, setIsDismissed] = useState(false);
+  const prevSuggestionsRef = React.useRef(suggestions.join(','));
 
-  if (suggestions.length === 0) return null;
+  React.useEffect(() => {
+    const currentStr = suggestions.join(',');
+    if (currentStr !== prevSuggestionsRef.current) {
+      prevSuggestionsRef.current = currentStr;
+      setIsDismissed(false);
+    }
+  }, [suggestions]);
 
-  const inputRect = adapter.getInputRect();
-  if (!inputRect) return null;
+  // Measure once on mount and when suggestions change (not on every render)
+  useLayoutEffect(() => {
+    if (suggestions.length > 0) {
+      setInputRect(adapter.getInputRect());
+    }
+  }, [adapter, suggestions.length]);
+
+  if (isDismissed || suggestions.length === 0 || !inputRect) return null;
 
   // Estimate the panel height to decide if it fits below
   const estimatedPanelHeight =
@@ -74,10 +89,13 @@ export const InlineSuggestions: React.FC<InlineSuggestionsProps> = ({ adapter })
   return (
     <AnimatePresence>
       <motion.div
+        drag
+        dragMomentum={false}
         initial={{ opacity: 0, y: showAbove ? 4 : -4 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: showAbove ? 4 : -4 }}
         transition={{ duration: 0.15 }}
+        whileDrag={{ scale: 1.02, boxShadow: '0 16px 36px rgba(124, 92, 252, 0.18)' }}
         style={{
           position: 'fixed',
           left: inputRect.left,
@@ -85,6 +103,7 @@ export const InlineSuggestions: React.FC<InlineSuggestionsProps> = ({ adapter })
           zIndex: 2147483646,
           pointerEvents: 'auto',
           maxWidth: Math.min(inputRect.width, 350),
+          cursor: 'grab',
         }}
       >
         <div
@@ -98,17 +117,37 @@ export const InlineSuggestions: React.FC<InlineSuggestionsProps> = ({ adapter })
               : '0 8px 24px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(124, 92, 252, 0.04)',
           }}
         >
+          {/* Draggable Header with Close Button */}
           <div
-            className="px-3 py-2 flex items-center gap-1.5"
-            style={{ borderBottom: '1px solid #ECE9FF' }}
+            className="px-3 py-2 flex items-center justify-between gap-2 select-none cursor-grab active:cursor-grabbing"
+            style={{ borderBottom: '1px solid #ECE9FF', background: '#FAFAFE' }}
           >
-            <span style={{ color: '#7C5CFC' }}>
-              <RoleIcon name="Lightbulb" size={13} strokeWidth={2} />
-            </span>
-            <span className="text-[11px] font-semibold" style={{ color: '#1a1a2e' }}>
-              Suggestions
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span style={{ color: '#A78BFA', display: 'flex' }} title="Drag to reposition">
+                <RoleIcon name="GripHorizontal" size={14} strokeWidth={2} />
+              </span>
+              <span style={{ color: '#7C5CFC', display: 'flex' }}>
+                <RoleIcon name="Lightbulb" size={13} strokeWidth={2} />
+              </span>
+              <span className="text-[11px] font-bold" style={{ color: '#1a1a2e' }}>
+                Suggestions
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsDismissed(true);
+              }}
+              onPointerDown={(e) => e.stopPropagation()}
+              title="Close Suggestions"
+              className="w-5 h-5 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+            >
+              <RoleIcon name="X" size={12} strokeWidth={2} />
+            </button>
           </div>
+
           <div className="p-1.5">
             {suggestions.map((suggestion, i) => {
               const iconName = SUGGESTION_ICONS[suggestion] ?? 'Lightbulb';
@@ -119,6 +158,7 @@ export const InlineSuggestions: React.FC<InlineSuggestionsProps> = ({ adapter })
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: i * 0.03 }}
                   onClick={() => handleSuggestionClick(suggestion)}
+                  onPointerDown={(e) => e.stopPropagation()}
                   className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg transition-all duration-150 text-left"
                   style={{ cursor: 'pointer', background: 'transparent', border: 'none' }}
                   onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; }}

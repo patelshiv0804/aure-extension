@@ -3,7 +3,7 @@
 // Provides quick Undo, optional Compare modal trigger, and Dismiss
 // ──────────────────────────────────────────────────────────────
 
-import React from 'react';
+import React, { useRef, useState, useLayoutEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
 import { RoleIcon } from '../common/RoleIcon';
@@ -21,12 +21,17 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   onCompare,
   onDismiss,
 }) => {
-  const inputRect = adapter.getInputRect();
-  if (!inputRect) return null;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  // Position: top-left above the input box
-  const top = Math.max(12, inputRect.top - 46);
-  const left = inputRect.left;
+  // Measure position once on mount (avoids reflow on every render)
+  useLayoutEffect(() => {
+    const rect = adapter.getInputRect();
+    if (!rect) return;
+    setPos({ top: Math.max(12, rect.top - 46), left: rect.left });
+  }, [adapter]);
+
+  if (!pos) return null;
+  const { top, left } = pos;
 
   return (
     <AnimatePresence>

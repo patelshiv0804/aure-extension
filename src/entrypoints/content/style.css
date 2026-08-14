@@ -1,10 +1,9 @@
-@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ── Content Script Root Styles ─────────────────────────────── */
+/* ── Content Script Root Styles (Scoped to #pe-app) ─────────── */
 
-:host {
+#pe-app {
   all: initial;
   display: block;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
@@ -13,6 +12,15 @@
   color: #1a1a2e;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+#pe-app,
+#pe-app *,
+#pe-app ::before,
+#pe-app ::after {
+  box-sizing: border-box;
+  border-style: solid;
+  border-width: 0;
 }
 
 /* ── Glassmorphism Base ──────────────────────────────────────── */

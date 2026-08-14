@@ -33,6 +33,10 @@ export interface MessageMap {
     payload: PromptHistoryFilters;
     response: PromptHistoryResult;
   };
+  DELETE_PROMPT: {
+    payload: { promptId: string };
+    response: { success: boolean };
+  };
 
   // Model Recommendation
   RECOMMEND_MODEL: {

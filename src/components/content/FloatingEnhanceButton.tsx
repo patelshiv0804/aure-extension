@@ -95,16 +95,37 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 
   useEffect(() => {
     computePosition();
-    const interval = setInterval(computePosition, 150);
+
+    // Rapid boot retries: snap the button into position within ~300ms of mount.
+    // These fire once and stop — they're just to handle cases where currentInput
+    // isn't yet set on the very first render tick.
+    const bootTimers = [50, 150, 300].map((d) => setTimeout(computePosition, d));
+
+    // Use ResizeObserver for efficient tracking of input size changes
+    let resizeObserver: ResizeObserver | null = null;
+    const inputEl = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
+    if (inputEl && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        computePosition();
+      });
+      resizeObserver.observe(inputEl);
+    }
+
+    // Long-term fallback: 2s interval (low frequency, no jank) to keep the
+    // button in sync if the input moves (e.g. ChatGPT adds composer toolbar).
+    const fallbackInterval = setInterval(computePosition, 2000);
+
     window.addEventListener('scroll', computePosition, { passive: true });
     window.addEventListener('resize', computePosition, { passive: true });
 
     return () => {
-      clearInterval(interval);
+      bootTimers.forEach(clearTimeout);
+      resizeObserver?.disconnect();
+      clearInterval(fallbackInterval);
       window.removeEventListener('scroll', computePosition);
       window.removeEventListener('resize', computePosition);
     };
-  }, [computePosition]);
+  }, [computePosition, adapter]);
 
   const handleHistoryClick = () => {
     if (onOpenHistory) {
@@ -147,6 +168,20 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#7C5CFC', fontWeight: 700, fontSize: 11 }}>
               <RoleIcon name="Lock" size={13} strokeWidth={2.2} />
               <span>Please Sign In</span>
+            </div>
+          );
+        }
+
+        const isEmptyPromptError =
+          errStr.includes('enter a prompt') ||
+          errStr.includes('empty prompt') ||
+          errStr.includes('enter text');
+
+        if (isEmptyPromptError) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#F59E0B', fontWeight: 700, fontSize: 11 }}>
+              <RoleIcon name="AlertCircle" size={14} strokeWidth={2.2} />
+              <span>Enter Prompt</span>
             </div>
           );
         }
@@ -259,6 +294,37 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             >
               Sign In Now →
             </button>
+          </motion.div>
+        )}
+
+        {/* Floating Notification Banner for Empty Prompt / Other Errors */}
+        {flowState === 'error' && !isAuthError && error && (
+          <motion.div
+            initial={{ opacity: 0, y: 6, scale: 0.94 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 6, scale: 0.94 }}
+            style={{
+              position: 'absolute',
+              bottom: '100%',
+              marginBottom: 8,
+              right: 0,
+              whiteSpace: 'nowrap',
+              background: '#171A2B',
+              color: '#FFFFFF',
+              padding: '7px 12px',
+              borderRadius: '12px',
+              fontSize: '11px',
+              fontWeight: 600,
+              boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              zIndex: 2147483647,
+              border: '1px solid rgba(245, 158, 11, 0.4)',
+            }}
+          >
+            <span style={{ color: '#F59E0B' }}>⚠️</span>
+            <span>{error}</span>
           </motion.div>
         )}
 

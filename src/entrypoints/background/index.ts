@@ -7,7 +7,7 @@ import { initMessageListener, onMessage } from '@/lib/messaging';
 import { migrateStorageIfNeeded, getSettings, updateSettings } from '@/lib/storage';
 import { enhancePrompt } from '@/api/enhance';
 import { saveVersion, getVersions } from '@/api/versions';
-import { getPromptHistory } from '@/api/history';
+import { getPromptHistory, deletePrompt } from '@/api/history';
 import { recommendModel } from '@/api/recommend';
 
 export default defineBackground(() => {
@@ -49,6 +49,11 @@ export default defineBackground(() => {
 
   onMessage('GET_HISTORY', async (payload) => {
     return await getPromptHistory(payload);
+  });
+
+  onMessage('DELETE_PROMPT', async (payload) => {
+    const success = await deletePrompt(payload.promptId);
+    return { success };
   });
 
   onMessage('RECOMMEND_MODEL', async (payload) => {
