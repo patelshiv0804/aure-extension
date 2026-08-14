@@ -1,11 +1,8 @@
-// ──────────────────────────────────────────────────────────────
-// SidePanelRoot — Workspace with segmented tab control
-// ──────────────────────────────────────────────────────────────
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSettingsStore } from '@/stores/settings.store';
 import { useAuthStore } from '@/stores/auth.store';
+import { isKnownSite } from '@/adapters/registry';
 import { FullHistory } from './FullHistory';
 import { Analytics } from './Analytics';
 import { AuthView } from '../auth/AuthView';
@@ -20,9 +17,56 @@ export const SidePanelRoot: React.FC = () => {
   const { user, isAuthenticated, loadAuth, logout } = useAuthStore();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
+  const [isSupportedSite, setIsSupportedSite] = useState<boolean>(true);
+  const [currentTabHost, setCurrentTabHost] = useState<string>('');
+
+  const checkActiveTab = useCallback(async () => {
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      try {
+        const [lastFocusedTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+        let activeTabObj: chrome.tabs.Tab | undefined = lastFocusedTab;
+
+        if (!activeTabObj || !activeTabObj.url) {
+          const [currentWinTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+          activeTabObj = currentWinTab;
+        }
+
+        if (!activeTabObj || !activeTabObj.url) {
+          const allTabs = await chrome.tabs.query({ active: true });
+          activeTabObj = allTabs.find((t) => t.url && !t.url.startsWith('chrome-extension://') && !t.url.startsWith('chrome://'));
+        }
+
+        if (activeTabObj?.url) {
+          const url = activeTabObj.url;
+          if (url.startsWith('chrome-extension://') || url.startsWith('chrome://')) {
+            setIsSupportedSite(false);
+            setCurrentTabHost('Extension Page');
+            return;
+          }
+          try {
+            const host = new URL(url).hostname;
+            const supported = isKnownSite(host);
+            setIsSupportedSite(supported);
+            setCurrentTabHost(host);
+          } catch {
+            setIsSupportedSite(false);
+            setCurrentTabHost('');
+          }
+        } else {
+          setIsSupportedSite(false);
+          setCurrentTabHost('');
+        }
+      } catch (e) {
+        console.warn('[AURE Sidepanel] Failed to check active tab:', e);
+        setIsSupportedSite(false);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     loadSettings();
     loadAuth();
+    checkActiveTab();
 
     const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
       if (
@@ -33,11 +77,41 @@ export const SidePanelRoot: React.FC = () => {
       }
     };
 
-    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      chrome.storage.onChanged.addListener(handleStorageChange);
-      return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+    if (typeof chrome !== 'undefined') {
+      if (chrome.storage?.onChanged) {
+        chrome.storage.onChanged.addListener(handleStorageChange);
+      }
+
+      if (chrome.tabs) {
+        const handleActivated = () => {
+          checkActiveTab();
+        };
+        const handleUpdated = (_tabId: number, changeInfo: chrome.tabs.TabChangeInfo) => {
+          if (changeInfo.status === 'complete' || changeInfo.url) {
+            checkActiveTab();
+          }
+        };
+
+        chrome.tabs.onActivated.addListener(handleActivated);
+        chrome.tabs.onUpdated.addListener(handleUpdated);
+
+        if (chrome.windows?.onFocusChanged) {
+          chrome.windows.onFocusChanged.addListener(handleActivated);
+        }
+
+        return () => {
+          if (chrome.storage?.onChanged) {
+            chrome.storage.onChanged.removeListener(handleStorageChange);
+          }
+          chrome.tabs.onActivated.removeListener(handleActivated);
+          chrome.tabs.onUpdated.removeListener(handleUpdated);
+          if (chrome.windows?.onFocusChanged) {
+            chrome.windows.onFocusChanged.removeListener(handleActivated);
+          }
+        };
+      }
     }
-  }, [loadSettings, loadAuth]);
+  }, [loadSettings, loadAuth, checkActiveTab]);
 
   // Reset showAuthView once user successfully logs in
   useEffect(() => {
@@ -51,8 +125,92 @@ export const SidePanelRoot: React.FC = () => {
     { id: 'analytics', label: 'Analytics', icon: 'BarChart3' },
   ];
 
+  // Return dedicated non-scrollable centered view for unsupported sites
+  if (!isSupportedSite) {
+    return (
+      <div className="h-screen w-full max-h-screen overflow-hidden flex flex-col items-center justify-center p-6 text-center select-none relative bg-[#FAFAFE]">
+        {/* Soft Ambient Blur Orbs */}
+        <div className="absolute top-1/4 -left-12 w-64 h-64 rounded-full bg-purple-200/50 blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 -right-12 w-64 h-64 rounded-full bg-indigo-200/50 blur-3xl pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full bg-purple-100/40 blur-3xl pointer-events-none" />
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          className="relative z-10 w-full max-w-[310px] bg-white/90 backdrop-blur-2xl p-6 rounded-3xl border border-purple-100/80 shadow-[0_16px_40px_rgba(124,92,252,0.08)] flex flex-col items-center text-center space-y-4"
+        >
+          {/* Brand Icon Header */}
+          <div className="relative flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-white border border-purple-100 flex items-center justify-center shadow-xs">
+              <img src="/logo.png" alt="AURE" className="w-7 h-7 object-contain" />
+            </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-amber-500 border-2 border-white flex items-center justify-center text-[9px] font-bold text-white shadow-2xs">
+              !
+            </span>
+          </div>
+
+          {/* Title & Domain Tag */}
+          <div className="space-y-2 w-full">
+            <h3 className="text-[16px] font-bold text-slate-900 tracking-tight">
+              This Site is Not Supported
+            </h3>
+
+            {currentTabHost && (
+              <div className="flex justify-center">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-mono text-slate-600 max-w-[240px] truncate shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                  {currentTabHost}
+                </span>
+              </div>
+            )}
+
+            <p className="text-[12px] text-slate-500 leading-relaxed px-1">
+              AURE Workspace is active on supported AI platforms. Open a chat site below to view prompt history & features.
+            </p>
+          </div>
+
+          {/* Supported AI Platforms Grid */}
+          <div className="w-full pt-3 border-t border-slate-100">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2.5">
+              Supported AI Platforms
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: 'ChatGPT', url: 'https://chatgpt.com', color: '#10A37F' },
+                { name: 'Claude', url: 'https://claude.ai', color: '#D97706' },
+                { name: 'Gemini', url: 'https://gemini.google.com', color: '#1A73E8' },
+                { name: 'Perplexity', url: 'https://perplexity.ai', color: '#20B2AA' },
+                { name: 'Grok', url: 'https://grok.com', color: '#0F172A' },
+                { name: 'DeepSeek', url: 'https://chat.deepseek.com', color: '#4F46E5' },
+              ].map((site) => (
+                <a
+                  key={site.name}
+                  href={site.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50/80 border border-slate-200/70 hover:border-purple-300 hover:bg-purple-50/60 hover:shadow-xs transition-all text-left text-decoration-none group"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span
+                      className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: site.color }}
+                    />
+                    <span className="text-[11.5px] font-semibold text-slate-800 group-hover:text-purple-700 transition-colors truncate">
+                      {site.name}
+                    </span>
+                  </div>
+                  <RoleIcon name="ExternalLink" size={11} className="text-slate-400 group-hover:text-purple-600 shrink-0 transition-colors" />
+                </a>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-col min-h-screen" style={{ background: '#FAFAFE' }}>
+    <div className="relative flex flex-col min-h-screen" style={{ background: '#FAFAFE' }}>
       {/* ── Header ─────────────────────────────────────────── */}
       <div
         className="sticky top-0 z-10"
