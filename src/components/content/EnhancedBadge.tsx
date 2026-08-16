@@ -10,24 +10,39 @@ import { RoleIcon } from '../common/RoleIcon';
 
 interface EnhancedBadgeProps {
   adapter: SiteAdapter;
+  isUndone: boolean;
   onUndo: () => void;
+  onReapply: () => void;
   onCompare: () => void;
   onDismiss: () => void;
 }
 
 export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   adapter,
+  isUndone,
   onUndo,
+  onReapply,
   onCompare,
   onDismiss,
 }) => {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
-  // Measure position once on mount (avoids reflow on every render)
+  // Measure position on mount & window scroll/resize
   useLayoutEffect(() => {
-    const rect = adapter.getInputRect();
-    if (!rect) return;
-    setPos({ top: Math.max(12, rect.top - 46), left: rect.left });
+    const updatePos = () => {
+      const rect = adapter.getInputRect();
+      if (!rect) return;
+      setPos({ top: Math.max(12, rect.top - 46), left: rect.left });
+    };
+
+    updatePos();
+
+    window.addEventListener('scroll', updatePos, true);
+    window.addEventListener('resize', updatePos);
+    return () => {
+      window.removeEventListener('scroll', updatePos, true);
+      window.removeEventListener('resize', updatePos);
+    };
   }, [adapter]);
 
   if (!pos) return null;
@@ -44,7 +59,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           position: 'fixed',
           left,
           top,
-          zIndex: 2147483647,
+          zIndex: 2147483645,
           pointerEvents: 'auto',
           display: 'flex',
           alignItems: 'center',
@@ -58,7 +73,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
         }}
       >
-        {/* ✨ Enhanced Label */}
+        {/* ✨ Enhanced / Undone Label */}
         <div
           style={{
             display: 'flex',
@@ -68,50 +83,86 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
             borderRight: '1px solid #ECE9FF',
           }}
         >
-          <span style={{ fontSize: 13, color: '#7C5CFC' }}>✨</span>
+          <span style={{ fontSize: 13, color: isUndone ? '#64748B' : '#7C5CFC' }}>
+            {isUndone ? '↩' : '✨'}
+          </span>
           <span
             style={{
               fontSize: 12,
               fontWeight: 700,
-              color: '#7C5CFC',
+              color: isUndone ? '#64748B' : '#7C5CFC',
               letterSpacing: '-0.01em',
             }}
           >
-            Enhanced
+            {isUndone ? 'Original' : 'Enhanced'}
           </span>
         </div>
 
-        {/* Undo Action */}
-        <button
-          onClick={onUndo}
-          title="Revert to original text"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 4,
-            height: 26,
-            padding: '0 8px',
-            borderRadius: 13,
-            background: '#F5F3FF',
-            border: 'none',
-            color: '#6D28D9',
-            fontSize: 12,
-            fontWeight: 600,
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#EDE9FE';
-            e.currentTarget.style.color = '#5B21B6';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = '#F5F3FF';
-            e.currentTarget.style.color = '#6D28D9';
-          }}
-        >
-          <RoleIcon name="RotateCcw" size={12} strokeWidth={2.2} />
-          <span>Undo</span>
-        </button>
+        {/* Undo or Retain Enhanced Prompt Action */}
+        {isUndone ? (
+          <button
+            onClick={onReapply}
+            title="Retain / reapply enhanced prompt"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              height: 26,
+              padding: '0 10px',
+              borderRadius: 13,
+              background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)',
+              border: 'none',
+              color: '#FFFFFF',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              boxShadow: '0 2px 8px rgba(124, 92, 252, 0.25)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.02)';
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(124, 92, 252, 0.35)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(124, 92, 252, 0.25)';
+            }}
+          >
+            <RoleIcon name="Sparkles" size={12} strokeWidth={2.2} />
+            <span>Retain Enhanced Prompt</span>
+          </button>
+        ) : (
+          <button
+            onClick={onUndo}
+            title="Revert to original text"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              height: 26,
+              padding: '0 8px',
+              borderRadius: 13,
+              background: '#F5F3FF',
+              border: 'none',
+              color: '#6D28D9',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#EDE9FE';
+              e.currentTarget.style.color = '#5B21B6';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = '#F5F3FF';
+              e.currentTarget.style.color = '#6D28D9';
+            }}
+          >
+            <RoleIcon name="RotateCcw" size={12} strokeWidth={2.2} />
+            <span>Undo</span>
+          </button>
+        )}
 
         {/* Compare Action */}
         <button
@@ -148,7 +199,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
         {/* Dismiss Button */}
         <button
           onClick={onDismiss}
-          title="Dismiss badge"
+          title="Dismiss toolbar"
           style={{
             display: 'flex',
             alignItems: 'center',

@@ -41,24 +41,6 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
     }
   };
 
-  useEffect(() => {
-    loadAuth();
-
-    const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
-      if (
-        areaName === 'local' &&
-        (changes['userProfile'] || changes['promptiq_token'] || changes['apiToken'] || changes['currentUserEmail'])
-      ) {
-        loadAuth();
-      }
-    };
-
-    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      chrome.storage.onChanged.addListener(handleStorageChange);
-      return () => chrome.storage.onChanged.removeListener(handleStorageChange);
-    }
-  }, [loadAuth]);
-
   const fetchHistory = useCallback(async () => {
     if (!isAuthenticated) {
       setPrompts([]);
@@ -79,6 +61,49 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
       setIsLoading(false);
     }
   }, [timeFilter, searchQuery, isAuthenticated]);
+
+  useEffect(() => {
+    loadAuth();
+
+    const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+      if (areaName === 'local') {
+        if (
+          changes['userProfile'] ||
+          changes['promptiq_token'] ||
+          changes['apiToken'] ||
+          changes['currentUserEmail']
+        ) {
+          loadAuth();
+        }
+        if (changes['last_history_update']) {
+          fetchHistory();
+        }
+      }
+    };
+
+    const handleRuntimeMessage = (message: any) => {
+      if (message?.type === 'HISTORY_UPDATED') {
+        fetchHistory();
+      }
+    };
+
+    if (typeof chrome !== 'undefined') {
+      if (chrome.storage?.onChanged) {
+        chrome.storage.onChanged.addListener(handleStorageChange);
+      }
+      if (chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+      }
+      return () => {
+        if (chrome.storage?.onChanged) {
+          chrome.storage.onChanged.removeListener(handleStorageChange);
+        }
+        if (chrome.runtime?.onMessage) {
+          chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+        }
+      };
+    }
+  }, [loadAuth, fetchHistory]);
 
   useEffect(() => {
     fetchHistory();

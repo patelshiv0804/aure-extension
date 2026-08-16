@@ -127,7 +127,11 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     };
   }, [computePosition, adapter]);
 
-  const handleHistoryClick = () => {
+  const handleHistoryClick = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     if (onOpenHistory) {
       onOpenHistory();
     } else {
@@ -135,6 +139,24 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
         console.error('[AURE] Failed to open side panel:', err);
       });
     }
+  };
+
+  const handleMainClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (flowState === 'enhancing') return;
+    if (isAuthError) {
+      handleHistoryClick(e);
+    } else {
+      onEnhance();
+    }
+  };
+
+  const handleModeClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (flowState === 'enhancing') return;
+    setFlowState('selecting');
   };
 
   const getButtonContent = () => {
@@ -157,13 +179,13 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
         );
       case 'error':
         const errStr = (error || '').toLowerCase();
-        const isAuthError =
+        const isAuthErr =
           errStr.includes('sign in') ||
           errStr.includes('logged in') ||
           errStr.includes('401') ||
           errStr.includes('unauthorized');
 
-        if (isAuthError) {
+        if (isAuthErr) {
           return (
             <div style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#7C5CFC', fontWeight: 700, fontSize: 11 }}>
               <RoleIcon name="Lock" size={13} strokeWidth={2.2} />
@@ -194,22 +216,26 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
         );
       default:
         return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.2s ease' }}>
-            {isMainHovered ? (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, fontWeight: 700, color: '#7C5CFC' }}>
-                <span style={{ color: '#9D7BFF' }}>✦</span> Enhance
-              </span>
-            ) : (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, fontWeight: 800, color: '#1E1B4B' }}>
-                <img
-                  src={chrome.runtime.getURL('logo.png')}
-                  alt="AURE"
-                  style={{ width: 16, height: 16, objectFit: 'contain' }}
-                />
-                <span style={{ letterSpacing: '-0.02em' }}>AURE</span>
-                <span style={{ color: '#9D7BFF', fontSize: 11, marginLeft: 1 }}>✦</span>
-              </span>
-            )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <img
+              src={chrome.runtime.getURL('logo.png')}
+              alt="AURE"
+              style={{ width: 16, height: 16, objectFit: 'contain', flexShrink: 0 }}
+            />
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: isMainHovered ? '#7C5CFC' : '#1E1B4B',
+                letterSpacing: '-0.01em',
+                transition: 'color 0.15s ease',
+              }}
+            >
+              Enhance
+            </span>
+            <span style={{ color: isMainHovered ? '#7C5CFC' : '#9D7BFF', fontSize: 11, marginLeft: 1, transition: 'color 0.15s ease' }}>
+              ✦
+            </span>
           </div>
         );
     }
@@ -281,6 +307,10 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             <span>You are not logged in.</span>
             <button
               onClick={handleHistoryClick}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
               style={{
                 background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)',
                 color: '#FFFFFF',
@@ -330,8 +360,13 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 
         {/* Minimal Mode / Role Icon Button */}
         <button
-          onClick={() => setFlowState('selecting')}
-          title="Mode"
+          onClick={handleModeClick}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          disabled={flowState === 'enhancing'}
+          title="Choose Role & Mode"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -342,13 +377,16 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             background: 'transparent',
             border: 'none',
             color: '#A78BFA',
-            cursor: 'pointer',
+            cursor: flowState === 'enhancing' ? 'not-allowed' : 'pointer',
+            opacity: flowState === 'enhancing' ? 0.5 : 1,
             transition: 'all 0.15s ease',
             padding: 0,
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#F5F3FF';
-            e.currentTarget.style.color = '#7C5CFC';
+            if (flowState !== 'enhancing') {
+              e.currentTarget.style.background = '#F5F3FF';
+              e.currentTarget.style.color = '#7C5CFC';
+            }
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.background = 'transparent';
@@ -361,7 +399,11 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
         {/* Minimal History Icon Button */}
         <button
           onClick={handleHistoryClick}
-          title="History"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          title="History & Workspaces"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -394,7 +436,12 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 
         {/* Main AURE / Enhance Orb Button */}
         <button
-          onClick={isAuthError ? handleHistoryClick : onEnhance}
+          onClick={handleMainClick}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          disabled={flowState === 'enhancing'}
           onMouseEnter={() => setIsMainHovered(true)}
           onMouseLeave={() => setIsMainHovered(false)}
           style={{
@@ -406,7 +453,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             borderRadius: '14px',
             background: isMainHovered ? 'linear-gradient(135deg, #F3F0FF, #EDE9FE)' : 'transparent',
             border: 'none',
-            cursor: 'pointer',
+            cursor: flowState === 'enhancing' ? 'not-allowed' : 'pointer',
+            opacity: flowState === 'enhancing' ? 0.7 : 1,
             transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
             whiteSpace: 'nowrap',
           }}

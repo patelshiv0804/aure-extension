@@ -13,6 +13,7 @@ import { sendMessage } from '@/lib/messaging';
 import type { EnhancementMode } from '@/types/enhancement';
 import { useAuthStore } from '@/stores/auth.store';
 import { getStorage } from '@/lib/storage';
+import { formatPromptText } from '@/lib/formatter';
 import { FloatingEnhanceButton } from './FloatingEnhanceButton';
 import { EnhancementModePanel } from './EnhancementModePanel';
 import { ComparisonPanel } from './ComparisonPanel';
@@ -37,6 +38,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     setRecommendation,
     activeInput,
     enhanceResult,
+    isUndone,
+    setIsUndone,
     reset,
   } = useEnhanceStore();
 
@@ -154,8 +157,16 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [flowState, reset]);
 
+  const isEnhancingRef = useRef(false);
+
   const triggerEnhance = useCallback(
     async (mode: EnhancementMode, role?: string, roleMode?: string) => {
+      // 1. Synchronously prevent concurrent enhancement requests
+      if (isEnhancingRef.current || useEnhanceStore.getState().flowState === 'enhancing') {
+        console.warn('[AURE] Enhance already in progress, ignoring duplicate call');
+        return;
+      }
+
       const prompt = adapterRef.current.extractPrompt();
       if (!prompt.trim()) {
         useEnhanceStore.getState().setError('Please enter a prompt first.');
@@ -168,28 +179,29 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         return;
       }
 
-      // Check login status before calling backend API
-      await useAuthStore.getState().loadAuth();
-      const { isAuthenticated, user } = useAuthStore.getState();
-      const cachedProfile = await getStorage('userProfile');
-
-      if (!isAuthenticated && !user && !cachedProfile) {
-        useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
-        setFlowState('error');
-        // Open workspace sidepanel automatically for quick login
-        sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
-        return;
-      }
-
+      // Mark as enhancing immediately (synchronous lock before any await)
+      isEnhancingRef.current = true;
+      setFlowState('enhancing');
       useEnhanceStore.getState().setError(null);
-
       setCurrentPrompt(prompt);
       useEnhanceStore.getState().setSelectedMode(mode);
       if (role) useEnhanceStore.getState().setSelectedRole(role);
       if (roleMode) useEnhanceStore.getState().setSelectedRoleMode(roleMode);
-      setFlowState('enhancing');
 
       try {
+        // Check login status before calling backend API
+        await useAuthStore.getState().loadAuth();
+        const { isAuthenticated, user } = useAuthStore.getState();
+        const cachedProfile = await getStorage('userProfile');
+
+        if (!isAuthenticated && !user && !cachedProfile) {
+          useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
+          setFlowState('error');
+          // Open workspace sidepanel automatically for quick login
+          sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
+          return;
+        }
+
         // Parallel: enhance + recommend
         const [result, recommendation] = await Promise.allSettled([
           sendMessage('ENHANCE_PROMPT', {
@@ -207,8 +219,10 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
         if (result.status === 'fulfilled') {
           setEnhanceResult(result.value);
-          // Directly replace text inside input box
-          await adapterRef.current.injectPrompt(result.value.enhancedPrompt);
+          // Directly replace text inside input box with formatted clean prompt
+          const cleanText = formatPromptText(result.value.enhancedPrompt);
+          await adapterRef.current.injectPrompt(cleanText);
+          setIsUndone(false);
           setFlowState('injected');
           useEnhanceStore.getState().setShowRecommendation(true);
         } else {
@@ -222,12 +236,17 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         const message = error instanceof Error ? error.message : 'Enhancement failed';
         useEnhanceStore.getState().setError(message);
         setFlowState('error');
+      } finally {
+        isEnhancingRef.current = false;
       }
     },
-    [setCurrentPrompt, setFlowState, setEnhanceResult, setRecommendation, adapter]
+    [setCurrentPrompt, setFlowState, setEnhanceResult, setRecommendation, adapter, setIsUndone]
   );
 
   const handleEnhanceClick = useCallback(() => {
+    if (isEnhancingRef.current || useEnhanceStore.getState().flowState === 'enhancing') {
+      return;
+    }
     const prompt = adapterRef.current.extractPrompt();
     if (!prompt.trim()) {
       useEnhanceStore.getState().setError('Please enter a prompt first.');
@@ -251,20 +270,32 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   }, []);
 
   const handleUndo = useCallback(async () => {
-    if (flowState === 'injected' && enhanceResult?.originalPrompt) {
+    if (enhanceResult?.originalPrompt) {
       try {
         await adapterRef.current.injectPrompt(enhanceResult.originalPrompt);
+        setIsUndone(true);
       } catch (err) {
         console.error('[AURE] Failed to undo prompt:', err);
       }
     }
-    reset();
-  }, [flowState, enhanceResult, reset]);
+  }, [enhanceResult, setIsUndone]);
+
+  const handleReapply = useCallback(async () => {
+    if (enhanceResult?.enhancedPrompt) {
+      try {
+        await adapterRef.current.injectPrompt(enhanceResult.enhancedPrompt);
+        setIsUndone(false);
+      } catch (err) {
+        console.error('[AURE] Failed to reapply enhanced prompt:', err);
+      }
+    }
+  }, [enhanceResult, setIsUndone]);
 
   const handleInjectPrompt = useCallback(
     async (text: string) => {
       try {
-        await adapterRef.current.injectPrompt(text);
+        await adapterRef.current.injectPrompt(formatPromptText(text));
+        setIsUndone(false);
         setFlowState('injected');
       } catch (error) {
         console.error('[AURE] Injection failed:', error);
@@ -272,7 +303,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         setFlowState('error');
       }
     },
-    [setFlowState]
+    [setFlowState, setIsUndone]
   );
 
   return (
@@ -291,11 +322,13 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         <EnhancementModePanel adapter={adapter} onSelectMode={triggerEnhance} />
       )}
 
-      {/* In-Place Enhanced Badge (Undo / Compare) */}
-      {flowState === 'injected' && (
+      {/* In-Place Enhanced Badge (Undo / Retain Enhanced Prompt / Compare) */}
+      {(flowState === 'injected' || flowState === 'comparing') && enhanceResult && (
         <EnhancedBadge
           adapter={adapter}
+          isUndone={isUndone}
           onUndo={handleUndo}
+          onReapply={handleReapply}
           onCompare={() => setFlowState('comparing')}
           onDismiss={() => reset()}
         />
@@ -306,7 +339,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         <ComparisonPanel
           adapter={adapter}
           onAccept={handleInjectPrompt}
-          onReject={handleUndo}
+          onReject={() => setFlowState('injected')}
         />
       )}
 

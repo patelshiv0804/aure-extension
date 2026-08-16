@@ -26,6 +26,7 @@ export function useEnhance() {
 
   const enhance = useCallback(
     async (prompt: string, mode: EnhancementMode, platform: string) => {
+      if (useEnhanceStore.getState().flowState === 'enhancing') return;
       setCurrentPrompt(prompt);
       setSelectedMode(mode);
       setFlowState('enhancing');

@@ -50,7 +50,36 @@ export function usePromptHistory(initialFilters?: PromptHistoryFilters) {
 
   useEffect(() => {
     fetchHistory();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
+      if (areaName === 'local' && changes['last_history_update']) {
+        fetchHistory();
+      }
+    };
+
+    const handleRuntimeMessage = (message: any) => {
+      if (message?.type === 'HISTORY_UPDATED') {
+        fetchHistory();
+      }
+    };
+
+    if (typeof chrome !== 'undefined') {
+      if (chrome.storage?.onChanged) {
+        chrome.storage.onChanged.addListener(handleStorageChange);
+      }
+      if (chrome.runtime?.onMessage) {
+        chrome.runtime.onMessage.addListener(handleRuntimeMessage);
+      }
+      return () => {
+        if (chrome.storage?.onChanged) {
+          chrome.storage.onChanged.removeListener(handleStorageChange);
+        }
+        if (chrome.runtime?.onMessage) {
+          chrome.runtime.onMessage.removeListener(handleRuntimeMessage);
+        }
+      };
+    }
+  }, [fetchHistory]);
 
   return {
     prompts,

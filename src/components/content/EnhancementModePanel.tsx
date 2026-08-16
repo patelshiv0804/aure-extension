@@ -21,6 +21,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
 }) => {
   const {
     currentPrompt,
+    flowState,
     selectedRole,
     setSelectedRole,
     selectedRoleMode,
@@ -30,6 +31,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const modesSectionRef = React.useRef<HTMLDivElement>(null);
 
   // Filter roles based on searchQuery
@@ -71,9 +73,18 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
   );
 
   // Explicitly trigger prompt enhancement
-  const handleEnhanceClick = useCallback(() => {
-    onSelectMode(activeRoleObj.id as EnhancementMode, activeRoleObj.id, selectedRoleMode);
-  }, [onSelectMode, activeRoleObj, selectedRoleMode]);
+  const handleEnhanceClick = useCallback(
+    (e?: React.MouseEvent) => {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (isSubmitting || flowState === 'enhancing') return;
+      setIsSubmitting(true);
+      onSelectMode(activeRoleObj.id as EnhancementMode, activeRoleObj.id, selectedRoleMode);
+    },
+    [onSelectMode, activeRoleObj, selectedRoleMode, isSubmitting, flowState]
+  );
 
   const inputRect = adapter.getInputRect();
   if (!inputRect) return null;
@@ -417,6 +428,11 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
           {/* Prominent Enhance Button */}
           <button
             onClick={handleEnhanceClick}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            disabled={isSubmitting || flowState === 'enhancing'}
             style={{
               width: '100%',
               padding: '11px 16px',
@@ -426,7 +442,8 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
               border: 'none',
               fontSize: 13,
               fontWeight: 700,
-              cursor: 'pointer',
+              cursor: isSubmitting || flowState === 'enhancing' ? 'not-allowed' : 'pointer',
+              opacity: isSubmitting || flowState === 'enhancing' ? 0.75 : 1,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -435,18 +452,31 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
               transition: 'all 0.18s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'translateY(-1px)';
-              e.currentTarget.style.boxShadow = '0 6px 18px rgba(124, 92, 252, 0.4)';
+              if (!isSubmitting && flowState !== 'enhancing') {
+                e.currentTarget.style.transform = 'translateY(-1px)';
+                e.currentTarget.style.boxShadow = '0 6px 18px rgba(124, 92, 252, 0.4)';
+              }
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 4px 14px rgba(124, 92, 252, 0.3)';
             }}
           >
-            <RoleIcon name="Sparkles" size={16} strokeWidth={2} />
-            <span>
-              Enhance Prompt as {activeRoleObj.label}{selectedRoleMode ? ` (${selectedRoleMode})` : ''}
-            </span>
+            {isSubmitting || flowState === 'enhancing' ? (
+              <>
+                <span className="pe-spinner" style={{ display: 'inline-flex' }}>
+                  <RoleIcon name="Loader2" size={16} strokeWidth={2.2} />
+                </span>
+                <span>Enhancing Prompt…</span>
+              </>
+            ) : (
+              <>
+                <RoleIcon name="Sparkles" size={16} strokeWidth={2} />
+                <span>
+                  Enhance Prompt as {activeRoleObj.label}{selectedRoleMode ? ` (${selectedRoleMode})` : ''}
+                </span>
+              </>
+            )}
           </button>
 
           {/* Status Indicator */}

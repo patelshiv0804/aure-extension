@@ -28,6 +28,13 @@ export default defineBackground(() => {
       role: payload.role,
       context: { platform: payload.platform },
     });
+
+    // Notify all open extension windows (sidepanel, popup, etc.) to refresh history immediately
+    try {
+      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: result }).catch(() => {});
+      chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+    } catch {}
+
     return result;
   });
 
@@ -39,6 +46,12 @@ export default defineBackground(() => {
       source: payload.version.source,
       mode: payload.version.mode,
     });
+
+    try {
+      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: result }).catch(() => {});
+      chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+    } catch {}
+
     return { success: result.success, versionId: result.versionId };
   });
 
@@ -53,6 +66,10 @@ export default defineBackground(() => {
 
   onMessage('DELETE_PROMPT', async (payload) => {
     const success = await deletePrompt(payload.promptId);
+    try {
+      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: payload.promptId } }).catch(() => {});
+      chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+    } catch {}
     return { success };
   });
 
@@ -73,8 +90,17 @@ export default defineBackground(() => {
   });
 
   onMessage('OPEN_SIDE_PANEL', async (_payload, sender) => {
-    if (sender.tab?.windowId) {
-      await chrome.sidePanel.open({ windowId: sender.tab.windowId });
+    try {
+      if (sender.tab?.windowId) {
+        await chrome.sidePanel.open({ windowId: sender.tab.windowId });
+      } else {
+        const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (currentTab?.windowId) {
+          await chrome.sidePanel.open({ windowId: currentTab.windowId });
+        }
+      }
+    } catch (err) {
+      console.warn('[AURE Background] Failed to open side panel:', err);
     }
     return { success: true };
   });

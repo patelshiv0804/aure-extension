@@ -4,6 +4,7 @@
 
 import { apiRequest } from './client';
 import { historyCache } from '@/lib/cache';
+import { formatPromptText } from '@/lib/formatter';
 import type { HistoryApiResponse } from './types';
 import type { Prompt, PromptHistoryFilters, PromptHistoryResult } from '@/types/prompt';
 import type { EnhancementMode, PromptCategory } from '@/types/enhancement';
@@ -158,8 +159,8 @@ export async function getPromptHistory(
 
     if (response?.data) {
       const mappedPrompts = response.data.map((p) => {
-        const originalText = p.original_prompt ?? p.title ?? 'Untitled prompt';
-        const enhancedText = p.current_version?.content;
+        const originalText = formatPromptText(p.original_prompt ?? p.title ?? 'Untitled prompt');
+        const enhancedText = p.current_version?.content ? formatPromptText(p.current_version.content) : undefined;
         const category = normalizeCategory(
           p.template?.role ?? p.template?.mode ?? p.title?.split(' - ')[0]
         );

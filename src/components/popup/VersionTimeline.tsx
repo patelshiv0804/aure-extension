@@ -14,38 +14,48 @@ interface VersionTimelineProps {
 }
 
 // Directly inject prompt into the active ChatGPT / Claude / Gemini tab
+const AI_HOSTS = [
+  'chatgpt.com', 'chat.openai.com', 'claude.ai',
+  'gemini.google.com', 'perplexity.ai', 'grok.com',
+  'deepseek.com', 'copilot.microsoft.com',
+];
+
+/** Find the best target tab without fetching all tabs. */
+async function findTargetTab(): Promise<chrome.tabs.Tab | undefined> {
+  // Step 1: active tab in the last focused window (cheapest query)
+  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (activeTab?.url && (activeTab.url.startsWith('http://') || activeTab.url.startsWith('https://'))) {
+    return activeTab;
+  }
+
+  // Step 2: any active tab across windows
+  const activeTabs = await chrome.tabs.query({ active: true });
+  const activeAI = activeTabs.find((t) => t.url && AI_HOSTS.some((h) => t.url!.includes(h)));
+  if (activeAI) return activeAI;
+
+  // Step 3: any AI host tab (narrowly filtered)
+  const aiTabs = await chrome.tabs.query({ url: AI_HOSTS.map((h) => `*://${h}/*`) });
+  if (aiTabs.length) return aiTabs[0];
+
+  // Step 4: any active http tab
+  const anyActive = activeTabs.find((t) => t.url && (t.url.startsWith('http://') || t.url.startsWith('https://')));
+  return anyActive;
+}
+
 async function fillPromptInTab(text: string): Promise<boolean> {
   try {
-    // Query all tabs and find an AI chat page
-    const allTabs = await chrome.tabs.query({});
-    const AI_HOSTS = [
-      'chatgpt.com', 'chat.openai.com', 'claude.ai',
-      'gemini.google.com', 'perplexity.ai', 'grok.com',
-      'deepseek.com', 'copilot.microsoft.com',
-    ];
-
-    // Priority 1: active http tab in a normal window
-    let target = allTabs.find(
-      (t) => t.active && t.url && (t.url.startsWith('http://') || t.url.startsWith('https://')) && !t.url.startsWith('chrome-extension://')
-    );
-
-    // Priority 2: any open AI host tab
-    if (!target) {
-      target = allTabs.find(
-        (t) => t.url && AI_HOSTS.some((h) => t.url!.includes(h))
-      );
-    }
-
-    // Priority 3: any http tab
-    if (!target) {
-      target = allTabs.find(
-        (t) => t.url && (t.url.startsWith('http://') || t.url.startsWith('https://'))
-      );
-    }
-
+    const target = await findTargetTab();
     if (!target?.id) return false;
 
-    // First try to inject directly via chrome.scripting (most reliable)
+    // PRIMARY: send to the already-running content script — fast, no script injection overhead
+    try {
+      await chrome.tabs.sendMessage(target.id, { type: 'FILL_PROMPT', payload: { text } });
+      return true;
+    } catch {
+      // Content script not loaded on this tab (e.g. non-AI page), fall through to executeScript
+    }
+
+    // FALLBACK: inject script directly (works on any page, slower)
     try {
       await chrome.scripting.executeScript({
         target: { tabId: target.id },
@@ -58,19 +68,14 @@ async function fillPromptInTab(text: string): Promise<boolean> {
             'textarea',
             'div[role="textbox"]',
           ];
-
           let input: HTMLElement | null = null;
           for (const sel of selectors) {
             const el = document.querySelector<HTMLElement>(sel);
-            if (el && el.isConnected) {
-              input = el;
-              break;
-            }
+            if (el && el.isConnected) { input = el; break; }
           }
           if (!input) return false;
 
           input.focus();
-          input.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
           if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
             const nativeSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set;
@@ -82,28 +87,18 @@ async function fillPromptInTab(text: string): Promise<boolean> {
           }
 
           if (input.getAttribute('contenteditable') === 'true' || input.isContentEditable) {
-            input.innerHTML = '';
-            const lines = promptText.split('\n');
-            lines.forEach((line) => {
-              const p = document.createElement('p');
-              p.textContent = line || '\u200B';
-              (input as HTMLElement).appendChild(p);
-            });
-
-            try {
+            document.execCommand('selectAll', false);
+            if (!document.execCommand('insertText', false, promptText)) {
               const sel = window.getSelection();
               const range = document.createRange();
               range.selectNodeContents(input);
               sel?.removeAllRanges();
               sel?.addRange(range);
               document.execCommand('insertText', false, promptText);
-            } catch (_) { /* ignore */ }
-
+            }
             input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: promptText }));
             input.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: promptText }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
-            input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Process' }));
-            input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Process' }));
             return true;
           }
           return false;
@@ -112,15 +107,7 @@ async function fillPromptInTab(text: string): Promise<boolean> {
       });
       return true;
     } catch (scriptErr) {
-      console.warn('[AURE] scripting.executeScript failed, falling back to sendMessage:', scriptErr);
-    }
-
-    // Fallback: send message to content script
-    try {
-      await chrome.tabs.sendMessage(target.id, { type: 'FILL_PROMPT', payload: { text } });
-      return true;
-    } catch (msgErr) {
-      console.warn('[AURE] tabs.sendMessage failed:', msgErr);
+      console.warn('[AURE] executeScript also failed:', scriptErr);
       return false;
     }
   } catch (err) {
@@ -165,8 +152,8 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
   const handleAutoFill = async (e: React.MouseEvent, text: string, id: string) => {
     e.stopPropagation();
     try {
-      // Always copy to clipboard first as safe fallback
-      await navigator.clipboard.writeText(text).catch(() => {});
+      // Fire clipboard write in background — don't await so it doesn't delay the fill
+      navigator.clipboard.writeText(text).catch(() => {});
 
       const success = await fillPromptInTab(text);
       setFilledId(id);

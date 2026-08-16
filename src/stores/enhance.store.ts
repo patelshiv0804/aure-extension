@@ -55,6 +55,10 @@ interface EnhanceState {
   suggestions: string[];
   setSuggestions: (suggestions: string[]) => void;
 
+  // Undone state
+  isUndone: boolean;
+  setIsUndone: (isUndone: boolean) => void;
+
   // Reset
   reset: () => void;
 }
@@ -95,6 +99,9 @@ export const useEnhanceStore = create<EnhanceState>((set) => ({
   suggestions: [],
   setSuggestions: (suggestions) => set({ suggestions }),
 
+  isUndone: false,
+  setIsUndone: (isUndone) => set({ isUndone }),
+
   reset: () =>
     set({
       flowState: 'idle',
@@ -104,5 +111,6 @@ export const useEnhanceStore = create<EnhanceState>((set) => ({
       showRecommendation: false,
       error: null,
       suggestions: [],
+      isUndone: false,
     }),
 }));

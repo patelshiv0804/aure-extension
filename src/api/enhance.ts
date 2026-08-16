@@ -3,7 +3,8 @@
 // ──────────────────────────────────────────────────────────────
 
 import { apiRequest } from './client';
-import { enhanceCache } from '@/lib/cache';
+import { enhanceCache, historyCache } from '@/lib/cache';
+import { formatPromptText } from '@/lib/formatter';
 import type { EnhanceApiRequest, EnhanceApiResponse } from './types';
 import type { EnhanceResult, PromptCategory } from '@/types/enhancement';
 import { MODEL_MAP, AI_MODELS } from '@/constants/models';
@@ -34,8 +35,10 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
 
   const backendData = response.data;
   if (backendData) {
-    const originalWords = backendData.original_prompt.split(/\s+/).filter(Boolean).length;
-    const enhancedWords = backendData.enhanced_prompt.split(/\s+/).filter(Boolean).length;
+    const formattedOriginal = formatPromptText(backendData.original_prompt);
+    const formattedEnhanced = formatPromptText(backendData.enhanced_prompt);
+    const originalWords = formattedOriginal.split(/\s+/).filter(Boolean).length;
+    const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
     const origAnalysis = (backendData.original_analysis ?? (backendData as any).old_analysis) as any;
     const enhAnalysis = (backendData.enhanced_analysis ?? (backendData as any).new_analysis) as any;
 
@@ -59,8 +62,8 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
     });
 
     const result: EnhanceResult = {
-      originalPrompt: backendData.original_prompt,
-      enhancedPrompt: backendData.enhanced_prompt,
+      originalPrompt: formattedOriginal,
+      enhancedPrompt: formattedEnhanced,
       mode: request.mode,
       metrics: {
         clarity: afterScore,
@@ -74,7 +77,7 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
         readabilityOriginal: beforeScore,
         readabilityEnhanced: afterScore,
       },
-      category: detectCategory(backendData.original_prompt),
+      category: detectCategory(formattedOriginal),
       suggestions: backendData.comparison?.improvements ?? [],
       timestamp: Date.now(),
       originalAnalysis: origAnalysis,
@@ -83,6 +86,7 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
     };
 
     enhanceCache.set(cacheKey, result);
+    historyCache.clear();
     return result;
   }
 
@@ -90,9 +94,12 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
     throw new Error('Backend did not return an enhanced prompt.');
   }
 
+  const formattedOriginal = formatPromptText(response.original_prompt);
+  const formattedEnhanced = formatPromptText(response.enhanced_prompt);
+
   const result: EnhanceResult = {
-    originalPrompt: response.original_prompt,
-    enhancedPrompt: response.enhanced_prompt,
+    originalPrompt: formattedOriginal,
+    enhancedPrompt: formattedEnhanced,
     mode: response.mode,
     metrics: {
       clarity: response.metrics.clarity,
@@ -112,6 +119,7 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
   };
 
   enhanceCache.set(cacheKey, result);
+  historyCache.clear();
   return result;
 }
 

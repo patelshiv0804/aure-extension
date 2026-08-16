@@ -8,6 +8,7 @@ import { diffWords } from 'diff';
 import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
 import { analyzePrompt, calculateImprovements } from '@/lib/analytics';
+import { formatPromptText } from '@/lib/formatter';
 import { RoleIcon } from '../common/RoleIcon';
 
 interface ComparisonPanelProps {
@@ -518,7 +519,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
               <motion.button
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
-                onClick={() => onAccept(finalText)}
+                onClick={() => onAccept(formatPromptText(finalText))}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl"
                 style={{
                   fontSize: 13, fontWeight: 600, color: '#FFFFFF',

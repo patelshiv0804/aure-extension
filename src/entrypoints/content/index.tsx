@@ -69,7 +69,7 @@ export default defineContentScript({
             );
             if (fallbackEl) {
               fallbackEl.focus();
-              fallbackEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              fallbackEl.scrollIntoView({ behavior: 'instant', block: 'nearest' });
               
               if (fallbackEl instanceof HTMLTextAreaElement || fallbackEl instanceof HTMLInputElement) {
                 const nativeSetter = Object.getOwnPropertyDescriptor(
