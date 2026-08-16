@@ -17,6 +17,10 @@ export interface MessageMap {
     payload: { prompt: string; mode: EnhancementMode; role?: string; platform: string };
     response: EnhanceResult;
   };
+  REENHANCE_PROMPT: {
+    payload: { promptId: string; prompt?: string; mode?: EnhancementMode; platform?: string };
+    response: EnhanceResult;
+  };
 
   // Versioning
   SAVE_VERSION: {

@@ -61,7 +61,14 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
       };
     });
 
+    const promptId =
+      backendData.version?.prompt_id ??
+      (backendData as any).prompt_id ??
+      response.prompt_id ??
+      undefined;
+
     const result: EnhanceResult = {
+      promptId,
       originalPrompt: formattedOriginal,
       enhancedPrompt: formattedEnhanced,
       mode: request.mode,
@@ -98,6 +105,7 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
   const formattedEnhanced = formatPromptText(response.enhanced_prompt);
 
   const result: EnhanceResult = {
+    promptId: response.prompt_id || undefined,
     originalPrompt: formattedOriginal,
     enhancedPrompt: formattedEnhanced,
     mode: response.mode,
@@ -121,6 +129,106 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
   enhanceCache.set(cacheKey, result);
   historyCache.clear();
   return result;
+}
+
+/**
+ * Call the backend re-enhancement API: POST /api/v1/prompts/{prompt_id}/reenhance
+ */
+export async function reenhancePrompt(
+  promptId: string,
+  fallback?: { prompt: string; mode: EnhancementMode; role?: string }
+): Promise<EnhanceResult> {
+  if (promptId) {
+    try {
+      const response = await apiRequest<{
+        success?: boolean;
+        message?: string;
+        data?: {
+          prompt_id: string;
+          version_id: string;
+          version_number: number;
+          enhanced_prompt: string;
+          template_id?: string;
+          old_analysis?: any;
+          new_analysis?: any;
+          tool_recommendations?: any;
+        };
+      }>({
+        method: 'POST',
+        path: `/prompts/${promptId}/reenhance`,
+        body: {},
+        rateLimitKey: 'enhance',
+        timeout: 90_000,
+      });
+
+      const backendData = response.data;
+      if (backendData && backendData.enhanced_prompt) {
+        const formattedEnhanced = formatPromptText(backendData.enhanced_prompt);
+        const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
+        const origAnalysis = backendData.old_analysis;
+        const enhAnalysis = backendData.new_analysis;
+
+        const beforeScore = normalizeScore(origAnalysis?.overall_score ?? 0);
+        const afterScore = normalizeScore(enhAnalysis?.overall_score ?? beforeScore);
+        const improvementScore = Math.max(0, afterScore - beforeScore);
+
+        const rawTools = backendData.tool_recommendations?.tools ?? [];
+        const toolRecs = rawTools.map((t: any) => {
+          const name = t.name ?? 'AI Tool';
+          const info = MODEL_MAP[name.toLowerCase()] ?? AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
+          return {
+            name,
+            rank: t.rank ?? 1,
+            url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
+          };
+        });
+
+        const originalText = fallback?.prompt ? formatPromptText(fallback.prompt) : '';
+        const originalWords = originalText ? originalText.split(/\s+/).filter(Boolean).length : enhancedWords;
+
+        const result: EnhanceResult = {
+          promptId: backendData.prompt_id,
+          originalPrompt: originalText,
+          enhancedPrompt: formattedEnhanced,
+          mode: fallback?.mode ?? 'general',
+          metrics: {
+            clarity: afterScore,
+            specificity: Math.min(100, afterScore + Math.round(improvementScore / 2)),
+            context: Math.min(100, afterScore + Math.round(improvementScore / 3)),
+            successProbability: afterScore,
+            wordCountOriginal: originalWords,
+            wordCountEnhanced: enhancedWords,
+            tokenCountOriginal: Math.ceil(originalWords * 1.3),
+            tokenCountEnhanced: Math.ceil(enhancedWords * 1.3),
+            readabilityOriginal: beforeScore,
+            readabilityEnhanced: afterScore,
+          },
+          category: detectCategory(formattedEnhanced),
+          suggestions: [],
+          timestamp: Date.now(),
+          originalAnalysis: origAnalysis,
+          enhancedAnalysis: enhAnalysis,
+          toolRecommendations: toolRecs,
+        };
+
+        historyCache.clear();
+        return result;
+      }
+    } catch (err) {
+      console.warn('[AURE] Re-enhance via /prompts/{id}/reenhance failed, falling back to enhancePrompt:', err);
+      if (!fallback || !fallback.prompt) throw err;
+    }
+  }
+
+  if (fallback && fallback.prompt) {
+    return await enhancePrompt({
+      prompt: fallback.prompt,
+      mode: fallback.mode,
+      role: fallback.role,
+    });
+  }
+
+  throw new Error('Cannot re-enhance prompt: missing prompt data');
 }
 
 function detectCategory(prompt: string): PromptCategory {

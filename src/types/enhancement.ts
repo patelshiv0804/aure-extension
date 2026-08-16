@@ -69,6 +69,7 @@ export interface RecommendedToolItem {
 }
 
 export interface EnhanceResult {
+  promptId?: string;
   originalPrompt: string;
   enhancedPrompt: string;
   mode: EnhancementMode;

@@ -5,7 +5,7 @@
 
 import { initMessageListener, onMessage } from '@/lib/messaging';
 import { migrateStorageIfNeeded, getSettings, updateSettings } from '@/lib/storage';
-import { enhancePrompt } from '@/api/enhance';
+import { enhancePrompt, reenhancePrompt } from '@/api/enhance';
 import { saveVersion, getVersions } from '@/api/versions';
 import { getPromptHistory, deletePrompt } from '@/api/history';
 import { recommendModel } from '@/api/recommend';
@@ -30,6 +30,20 @@ export default defineBackground(() => {
     });
 
     // Notify all open extension windows (sidepanel, popup, etc.) to refresh history immediately
+    try {
+      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: result }).catch(() => {});
+      chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+    } catch {}
+
+    return result;
+  });
+
+  onMessage('REENHANCE_PROMPT', async (payload) => {
+    const result = await reenhancePrompt(payload.promptId, {
+      prompt: payload.prompt || '',
+      mode: payload.mode || 'general',
+    });
+
     try {
       chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: result }).catch(() => {});
       chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});

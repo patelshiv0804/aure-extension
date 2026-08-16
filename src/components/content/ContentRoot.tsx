@@ -3,14 +3,14 @@
 // Manages the enhancement flow state machine
 // ──────────────────────────────────────────────────────────────
 
-import React, { useEffect, useCallback, useRef } from 'react';
+import React, { useEffect, useCallback, useRef, useState } from 'react';
 import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
 import { useSettingsStore } from '@/stores/settings.store';
 import { classifyPrompt, getPromptSuggestions } from '@/lib/classifier';
 import { debounce } from '@/lib/debounce';
 import { sendMessage } from '@/lib/messaging';
-import type { EnhancementMode } from '@/types/enhancement';
+import type { EnhancementMode, EnhanceResult } from '@/types/enhancement';
 import { useAuthStore } from '@/stores/auth.store';
 import { getStorage } from '@/lib/storage';
 import { formatPromptText } from '@/lib/formatter';
@@ -18,7 +18,7 @@ import { FloatingEnhanceButton } from './FloatingEnhanceButton';
 import { EnhancementModePanel } from './EnhancementModePanel';
 import { ComparisonPanel } from './ComparisonPanel';
 import { ModelRecommendation } from './ModelRecommendation';
-import { EnhancedBadge } from './EnhancedBadge';
+import { EnhancedBadge, type PromptVersionItem } from './EnhancedBadge';
 
 interface ContentRootProps {
   adapter: SiteAdapter;
@@ -220,11 +220,19 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         if (result.status === 'fulfilled') {
           setEnhanceResult(result.value);
           // Directly replace text inside input box with formatted clean prompt
+          const orig = result.value.originalPrompt || prompt;
           const cleanText = formatPromptText(result.value.enhancedPrompt);
           await adapterRef.current.injectPrompt(cleanText);
           setIsUndone(false);
           setFlowState('injected');
           useEnhanceStore.getState().setShowRecommendation(true);
+
+          // Initialize version history: 0 = Original, 1 = v1-enhanced
+          setVersionHistory([
+            { versionNumber: 0, text: orig, label: 'Original' },
+            { versionNumber: 1, text: result.value.enhancedPrompt, label: 'v1-enhanced' },
+          ]);
+          setActiveVersionNumber(1);
         } else {
           throw new Error(result.reason?.message ?? 'Enhancement failed');
         }
@@ -269,19 +277,78 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     });
   }, []);
 
-  const handleUndo = useCallback(async () => {
-    if (enhanceResult?.originalPrompt) {
-      try {
-        await adapterRef.current.injectPrompt(enhanceResult.originalPrompt);
-        setIsUndone(true);
-      } catch (err) {
-        console.error('[AURE] Failed to undo prompt:', err);
+  const [versionHistory, setVersionHistory] = useState<PromptVersionItem[]>([]);
+  const [activeVersionNumber, setActiveVersionNumber] = useState<number>(1);
+  const [isReenhancing, setIsReenhancing] = useState(false);
+  const isReenhancingRef = useRef(false);
+
+  const handleSelectVersion = useCallback(
+    async (verNum: number) => {
+      const targetVer = versionHistory.find((v) => v.versionNumber === verNum);
+      if (targetVer) {
+        setActiveVersionNumber(verNum);
+        const formatted = formatPromptText(targetVer.text);
+        await adapterRef.current.injectPrompt(formatted);
+        setIsUndone(verNum === 0);
+        setFlowState('injected');
       }
+    },
+    [versionHistory, setIsUndone, setFlowState]
+  );
+
+  const handleReenhance = useCallback(async () => {
+    if (isReenhancingRef.current) return;
+    isReenhancingRef.current = true;
+    setIsReenhancing(true);
+
+    try {
+      const promptId = enhanceResult?.promptId;
+      const currentPromptText = adapterRef.current.extractPrompt() || enhanceResult?.enhancedPrompt || '';
+      const mode = useEnhanceStore.getState().selectedMode || enhanceResult?.mode || 'general';
+
+      const result: EnhanceResult = await sendMessage('REENHANCE_PROMPT', {
+        promptId: promptId || '',
+        prompt: currentPromptText,
+        mode,
+        platform: adapter.getPlatformName(),
+      });
+
+      if (result && result.enhancedPrompt) {
+        setEnhanceResult(result);
+        const cleanText = formatPromptText(result.enhancedPrompt);
+        await adapterRef.current.injectPrompt(cleanText);
+        setIsUndone(false);
+        setFlowState('injected');
+
+        setVersionHistory((prev) => {
+          const nextNum = prev.length;
+          setActiveVersionNumber(nextNum);
+          return [
+            ...prev,
+            {
+              versionNumber: nextNum,
+              text: result.enhancedPrompt,
+              label: `v${nextNum}-enhanced`,
+            },
+          ];
+        });
+      }
+    } catch (err) {
+      console.error('[AURE] Failed to re-enhance prompt:', err);
+    } finally {
+      isReenhancingRef.current = false;
+      setIsReenhancing(false);
     }
-  }, [enhanceResult, setIsUndone]);
+  }, [enhanceResult, adapter, setEnhanceResult, setIsUndone, setFlowState]);
+
+  const handleUndo = useCallback(async () => {
+    handleSelectVersion(0);
+  }, [handleSelectVersion]);
 
   const handleReapply = useCallback(async () => {
-    if (enhanceResult?.enhancedPrompt) {
+    if (versionHistory.length > 1) {
+      handleSelectVersion(versionHistory.length - 1);
+    } else if (enhanceResult?.enhancedPrompt) {
       try {
         await adapterRef.current.injectPrompt(enhanceResult.enhancedPrompt);
         setIsUndone(false);
@@ -289,7 +356,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         console.error('[AURE] Failed to reapply enhanced prompt:', err);
       }
     }
-  }, [enhanceResult, setIsUndone]);
+  }, [versionHistory, handleSelectVersion, enhanceResult, setIsUndone]);
 
   const handleInjectPrompt = useCallback(
     async (text: string) => {
@@ -322,15 +389,22 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         <EnhancementModePanel adapter={adapter} onSelectMode={triggerEnhance} />
       )}
 
-      {/* In-Place Enhanced Badge (Undo / Retain Enhanced Prompt / Compare) */}
+      {/* In-Place Enhanced Badge (Version Dropdown / Undo / Re-enhance) */}
       {(flowState === 'injected' || flowState === 'comparing') && enhanceResult && (
         <EnhancedBadge
           adapter={adapter}
           isUndone={isUndone}
           onUndo={handleUndo}
           onReapply={handleReapply}
-          onCompare={() => setFlowState('comparing')}
-          onDismiss={() => reset()}
+          onReenhance={handleReenhance}
+          isReenhancing={isReenhancing}
+          versions={versionHistory}
+          currentVersionNumber={activeVersionNumber}
+          onSelectVersion={handleSelectVersion}
+          onDismiss={() => {
+            setVersionHistory([]);
+            reset();
+          }}
         />
       )}
 

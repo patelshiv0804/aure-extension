@@ -1,20 +1,30 @@
 // ──────────────────────────────────────────────────────────────
 // EnhancedBadge — Floating badge after in-place prompt enhancement
-// Provides quick Undo, optional Compare modal trigger, and Dismiss
+// Provides version dropdown (v1, v2, etc.), Undo/Reapply, Re-enhance button, and Dismiss
 // ──────────────────────────────────────────────────────────────
 
-import React, { useRef, useState, useLayoutEffect } from 'react';
+import React, { useState, useLayoutEffect, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
 import { RoleIcon } from '../common/RoleIcon';
+
+export interface PromptVersionItem {
+  versionNumber: number;
+  text: string;
+  label?: string;
+}
 
 interface EnhancedBadgeProps {
   adapter: SiteAdapter;
   isUndone: boolean;
   onUndo: () => void;
   onReapply: () => void;
-  onCompare: () => void;
+  onReenhance?: () => void;
+  isReenhancing?: boolean;
   onDismiss: () => void;
+  versions?: PromptVersionItem[];
+  currentVersionNumber?: number;
+  onSelectVersion?: (versionNumber: number) => void;
 }
 
 export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
@@ -22,31 +32,106 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   isUndone,
   onUndo,
   onReapply,
-  onCompare,
+  onReenhance,
+  isReenhancing = false,
   onDismiss,
+  versions = [],
+  currentVersionNumber = 2,
+  onSelectVersion,
 }) => {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Measure position on mount & window scroll/resize
-  useLayoutEffect(() => {
-    const updatePos = () => {
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    window.addEventListener('mousedown', handleOutsideClick);
+    return () => window.removeEventListener('mousedown', handleOutsideClick);
+  }, [isDropdownOpen]);
+
+  // Compute exact position sticking to the top border of the chat area
+  const computePosition = useCallback(() => {
+    const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
+    if (!input) {
       const rect = adapter.getInputRect();
-      if (!rect) return;
-      setPos({ top: Math.max(12, rect.top - 46), left: rect.left });
-    };
+      if (rect) {
+        setPos({ top: Math.max(12, rect.top - 44), left: Math.max(12, rect.left) });
+      }
+      return;
+    }
 
-    updatePos();
+    // 1. Locate the outer chat composer container (e.g. form or composer wrapper)
+    const composer = input.closest('form, [data-composer-surface="true"], fieldset, div[class*="composer"]');
+    let targetRect: DOMRect = composer ? composer.getBoundingClientRect() : input.getBoundingClientRect();
 
-    window.addEventListener('scroll', updatePos, true);
-    window.addEventListener('resize', updatePos);
-    return () => {
-      window.removeEventListener('scroll', updatePos, true);
-      window.removeEventListener('resize', updatePos);
-    };
+    // 2. Fallback: walk up parents if input rect is too narrow
+    if (!composer) {
+      let el: HTMLElement | null = input;
+      for (let i = 0; i < 6 && el; i++) {
+        const parent = el.parentElement;
+        if (parent) {
+          const pRect = parent.getBoundingClientRect();
+          if (pRect.width >= targetRect.width * 1.05 && pRect.width < window.innerWidth * 0.95) {
+            targetRect = pRect;
+            break;
+          }
+        }
+        el = parent;
+      }
+    }
+
+    // Position badge right above the top border of the chat composer
+    const top = Math.max(12, targetRect.top - 42);
+    const left = Math.max(12, targetRect.left + 8);
+
+    setPos({ top, left });
   }, [adapter]);
+
+  useLayoutEffect(() => {
+    computePosition();
+
+    const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
+
+    let resizeObserver: ResizeObserver | null = null;
+    if (input && typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(() => {
+        computePosition();
+      });
+      resizeObserver.observe(input);
+      const composer = input.closest('form, [data-composer-surface="true"], fieldset, div[class*="composer"]');
+      if (composer) {
+        resizeObserver.observe(composer);
+      }
+    }
+
+    window.addEventListener('scroll', computePosition, true);
+    window.addEventListener('resize', computePosition);
+    if (input) {
+      input.addEventListener('scroll', computePosition, { passive: true });
+    }
+
+    return () => {
+      resizeObserver?.disconnect();
+      window.removeEventListener('scroll', computePosition, true);
+      window.removeEventListener('resize', computePosition);
+      if (input) {
+        input.removeEventListener('scroll', computePosition);
+      }
+    };
+  }, [computePosition, adapter]);
 
   if (!pos) return null;
   const { top, left } = pos;
+
+  const hasMultipleVersions = versions && versions.length > 1;
+  const currentVersion = versions.find((v) => v.versionNumber === currentVersionNumber) || versions[versions.length - 1];
+  const currentLabel = currentVersion?.label || (currentVersionNumber === 0 ? 'Original' : `v${currentVersionNumber}-enhanced`);
 
   return (
     <AnimatePresence>
@@ -71,6 +156,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           border: '1px solid #ECE9FF',
           boxShadow: '0 4px 20px rgba(124, 92, 252, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
+          userSelect: 'none',
         }}
       >
         {/* ✨ Enhanced / Undone Label */}
@@ -98,10 +184,168 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           </span>
         </div>
 
-        {/* Undo or Retain Enhanced Prompt Action */}
-        {isUndone ? (
+        {/* Version Dropdown (when multiple versions exist) OR Standard Undo Button */}
+        {hasMultipleVersions ? (
+          <div ref={dropdownRef} style={{ position: 'relative' }}>
+            <button
+              onClick={() => setIsDropdownOpen((prev) => !prev)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title="Select prompt version"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                height: 26,
+                padding: '0 10px',
+                borderRadius: 13,
+                background: isDropdownOpen ? '#EDE9FE' : '#F5F3FF',
+                border: '1px solid rgba(124, 92, 252, 0.25)',
+                color: '#6D28D9',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#EDE9FE';
+              }}
+              onMouseLeave={(e) => {
+                if (!isDropdownOpen) {
+                  e.currentTarget.style.background = '#F5F3FF';
+                }
+              }}
+            >
+              <RoleIcon name="RotateCcw" size={11} strokeWidth={2.2} />
+              <span>{currentLabel}</span>
+              <RoleIcon
+                name="ChevronDown"
+                size={11}
+                strokeWidth={2.5}
+                style={{
+                  transform: isDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.15s ease',
+                }}
+              />
+            </button>
+
+            {/* Version Selection Dropdown Menu */}
+            <AnimatePresence>
+              {isDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 4, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 4, scale: 0.95 }}
+                  transition={{ duration: 0.12 }}
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 8px)',
+                    left: 0,
+                    minWidth: 165,
+                    background: '#FFFFFF',
+                    borderRadius: 14,
+                    border: '1px solid #ECE9FF',
+                    boxShadow: '0 10px 30px rgba(124, 92, 252, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06)',
+                    padding: 5,
+                    zIndex: 2147483647,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '4px 8px 2px 8px',
+                      fontSize: 10,
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                      color: '#94A3B8',
+                    }}
+                  >
+                    Prompt Versions
+                  </div>
+                  {versions.map((ver) => {
+                    const isSelected = currentVersionNumber === ver.versionNumber;
+                    const isOriginal = ver.versionNumber === 0;
+                    return (
+                      <button
+                        key={ver.versionNumber}
+                        onClick={() => {
+                          onSelectVersion?.(ver.versionNumber);
+                          setIsDropdownOpen(false);
+                        }}
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 9px',
+                          borderRadius: 9,
+                          border: 'none',
+                          background: isSelected ? '#F5F3FF' : 'transparent',
+                          color: isSelected ? '#6D28D9' : '#334155',
+                          fontSize: 12,
+                          fontWeight: isSelected ? 700 : 500,
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          width: '100%',
+                          transition: 'all 0.1s ease',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.background = '#F8FAFC';
+                            e.currentTarget.style.color = '#1E293B';
+                          }
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) {
+                            e.currentTarget.style.background = 'transparent';
+                            e.currentTarget.style.color = '#334155';
+                          }
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              color: isSelected ? '#7C5CFC' : '#64748B',
+                              background: isSelected ? '#EDE9FE' : '#F1F5F9',
+                              padding: '1px 6px',
+                              borderRadius: 5,
+                            }}
+                          >
+                            {isOriginal ? 'Original' : `v${ver.versionNumber}`}
+                          </span>
+                          <span style={{ fontSize: 11.5 }}>
+                            {ver.label || (isOriginal ? 'Original' : `v${ver.versionNumber}-enhanced`)}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <span style={{ color: '#7C5CFC', display: 'flex' }}>
+                            <RoleIcon name="Check" size={13} strokeWidth={2.5} />
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        ) : isUndone ? (
           <button
             onClick={onReapply}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             title="Retain / reapply enhanced prompt"
             style={{
               display: 'flex',
@@ -134,6 +378,10 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
         ) : (
           <button
             onClick={onUndo}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
             title="Revert to original text"
             style={{
               display: 'flex',
@@ -164,41 +412,66 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           </button>
         )}
 
-        {/* Compare Action */}
+        {/* Re-enhance Action */}
         <button
-          onClick={onCompare}
-          title="Compare original vs enhanced side-by-side"
+          onClick={onReenhance}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
+          disabled={isReenhancing}
+          title="Re-enhance prompt using AI"
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 4,
+            gap: 5,
             height: 26,
-            padding: '0 8px',
+            padding: '0 10px',
             borderRadius: 13,
-            background: 'transparent',
-            border: '1px solid #ECE9FF',
-            color: '#64748B',
+            background: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
+            border: '1px solid rgba(167, 139, 250, 0.4)',
+            color: '#6D28D9',
             fontSize: 12,
-            fontWeight: 500,
-            cursor: 'pointer',
+            fontWeight: 600,
+            cursor: isReenhancing ? 'not-allowed' : 'pointer',
+            opacity: isReenhancing ? 0.7 : 1,
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#F8FAFC';
-            e.currentTarget.style.color = '#334155';
+            if (!isReenhancing) {
+              e.currentTarget.style.background = '#EDE9FE';
+              e.currentTarget.style.borderColor = '#A78BFA';
+              e.currentTarget.style.color = '#5B21B6';
+            }
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = '#64748B';
+            if (!isReenhancing) {
+              e.currentTarget.style.background = 'linear-gradient(135deg, #F5F3FF, #EDE9FE)';
+              e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.4)';
+              e.currentTarget.style.color = '#6D28D9';
+            }
           }}
         >
-          <RoleIcon name="Layers" size={12} strokeWidth={2} />
-          <span>Compare</span>
+          {isReenhancing ? (
+            <>
+              <RoleIcon name="Loader2" size={12} strokeWidth={2.5} className="animate-spin text-purple-600" />
+              <span>Re-enhancing...</span>
+            </>
+          ) : (
+            <>
+              <RoleIcon name="Sparkles" size={12} strokeWidth={2.2} />
+              <span>Re-enhance</span>
+            </>
+          )}
         </button>
 
         {/* Dismiss Button */}
         <button
           onClick={onDismiss}
+          onMouseDown={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+          }}
           title="Dismiss toolbar"
           style={{
             display: 'flex',
