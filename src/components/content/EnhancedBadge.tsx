@@ -20,6 +20,7 @@ interface EnhancedBadgeProps {
   onUndo: () => void;
   onReapply: () => void;
   onReenhance?: () => void;
+  onCancelReenhance?: () => void;
   isReenhancing?: boolean;
   onDismiss: () => void;
   versions?: PromptVersionItem[];
@@ -33,6 +34,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   onUndo,
   onReapply,
   onReenhance,
+  onCancelReenhance,
   isReenhancing = false,
   onDismiss,
   versions = [],
@@ -41,7 +43,29 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
 }) => {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [reenhanceProgress, setReenhanceProgress] = useState(0);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Smooth realistic percentage progress animation while re-enhancing
+  useEffect(() => {
+    if (!isReenhancing) {
+      setReenhanceProgress(0);
+      return;
+    }
+
+    setReenhanceProgress(15);
+    const interval = setInterval(() => {
+      setReenhanceProgress((prev) => {
+        if (prev >= 95) return Math.min(98, prev + 0.2);
+        if (prev >= 80) return Math.min(95, prev + 1.2);
+        if (prev >= 50) return Math.min(80, prev + 2.5);
+        return Math.min(50, prev + 4.5);
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [isReenhancing]);
+
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -414,27 +438,26 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
 
         {/* Re-enhance Action */}
         <button
-          onClick={onReenhance}
+          onClick={isReenhancing ? undefined : onReenhance}
           onMouseDown={(e) => {
             e.preventDefault();
             e.stopPropagation();
           }}
           disabled={isReenhancing}
-          title="Re-enhance prompt using AI"
+          title={isReenhancing ? 'Re-enhancing in progress' : 'Re-enhance prompt using AI'}
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: 5,
             height: 26,
-            padding: '0 10px',
+            padding: isReenhancing ? '0 8px' : '0 10px',
             borderRadius: 13,
             background: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
             border: '1px solid rgba(167, 139, 250, 0.4)',
             color: '#6D28D9',
             fontSize: 12,
             fontWeight: 600,
-            cursor: isReenhancing ? 'not-allowed' : 'pointer',
-            opacity: isReenhancing ? 0.7 : 1,
+            cursor: isReenhancing ? 'default' : 'pointer',
             transition: 'all 0.15s ease',
           }}
           onMouseEnter={(e) => {
@@ -455,7 +478,20 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           {isReenhancing ? (
             <>
               <RoleIcon name="Loader2" size={12} strokeWidth={2.5} className="animate-spin text-purple-600" />
-              <span>Re-enhancing...</span>
+              <span>Re-enhancing</span>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  fontFamily: 'monospace',
+                  color: '#7C5CFC',
+                  background: 'rgba(124, 92, 252, 0.12)',
+                  padding: '1px 4px',
+                  borderRadius: 4,
+                }}
+              >
+                {Math.round(reenhanceProgress)}%
+              </span>
             </>
           ) : (
             <>
@@ -465,39 +501,108 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           )}
         </button>
 
+        {/* Cancel Re-enhance button */}
+        {isReenhancing && onCancelReenhance && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCancelReenhance();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            title="Cancel re-enhancement"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              padding: '3px 7px',
+              height: 24,
+              borderRadius: 12,
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              color: '#EF4444',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#EF4444';
+              e.currentTarget.style.color = '#FFFFFF';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+              e.currentTarget.style.color = '#EF4444';
+            }}
+          >
+            <RoleIcon name="X" size={11} strokeWidth={2.5} />
+            <span>Cancel</span>
+          </button>
+        )}
+
         {/* Dismiss Button */}
-        <button
-          onClick={onDismiss}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          title="Dismiss toolbar"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 22,
-            height: 22,
-            borderRadius: 11,
-            background: 'transparent',
-            border: 'none',
-            color: '#94A3B8',
-            cursor: 'pointer',
-            marginLeft: 2,
-            transition: 'all 0.15s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#F1F5F9';
-            e.currentTarget.style.color = '#475569';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = '#94A3B8';
-          }}
-        >
-          <RoleIcon name="X" size={13} strokeWidth={2} />
-        </button>
+        {!isReenhancing && (
+          <button
+            onClick={onDismiss}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            title="Dismiss toolbar"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 22,
+              height: 22,
+              borderRadius: 11,
+              background: 'transparent',
+              border: 'none',
+              color: '#94A3B8',
+              cursor: 'pointer',
+              marginLeft: 2,
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = '#F1F5F9';
+              e.currentTarget.style.color = '#475569';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'transparent';
+              e.currentTarget.style.color = '#94A3B8';
+            }}
+          >
+            <RoleIcon name="X" size={13} strokeWidth={2} />
+          </button>
+        )}
+
+        {/* Bottom progress bar for re-enhancing */}
+        {isReenhancing && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 2.5,
+              background: 'rgba(124, 92, 252, 0.1)',
+              borderRadius: '0 0 20px 20px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                background: 'linear-gradient(90deg, #7C5CFC, #A78BFA, #10B981)',
+                width: `${Math.round(reenhanceProgress)}%`,
+                transition: 'width 0.12s ease-out',
+              }}
+            />
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );

@@ -6,7 +6,7 @@ import { apiRequest } from './client';
 import { enhanceCache, historyCache } from '@/lib/cache';
 import { formatPromptText } from '@/lib/formatter';
 import type { EnhanceApiRequest, EnhanceApiResponse } from './types';
-import type { EnhanceResult, PromptCategory } from '@/types/enhancement';
+import type { EnhanceResult, PromptCategory, EnhancementMode } from '@/types/enhancement';
 import { MODEL_MAP, AI_MODELS } from '@/constants/models';
 
 /**

@@ -14,26 +14,63 @@ interface FloatingEnhanceButtonProps {
   adapter: SiteAdapter;
   onEnhance: () => void;
   onOpenHistory?: () => void;
+  onCancel?: () => void;
 }
 
 const BUTTON_HEIGHT = 36;
 const BUTTON_WIDTH = 175;
+const ENHANCING_BUTTON_WIDTH = 240;
 
 export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   adapter,
   onEnhance,
   onOpenHistory,
+  onCancel,
 }) => {
   const { flowState, setFlowState, error } = useEnhanceStore();
   const { isAuthenticated, loadAuth } = useAuthStore();
   const [position, setPosition] = useState<{ x: number; y: number; width: number } | null>(null);
   const [isMainHovered, setIsMainHovered] = useState(false);
+  const [progress, setProgress] = useState(0);
   const buttonRef = useRef<HTMLDivElement>(null);
   const lastValidPosition = useRef<{ x: number; y: number; width: number } | null>(null);
 
   useEffect(() => {
     loadAuth();
   }, [loadAuth]);
+
+  // Smooth realistic percentage progress animation while enhancing
+  useEffect(() => {
+    if (flowState !== 'enhancing') {
+      setProgress(0);
+      return;
+    }
+
+    // Immediately kick off with 12% progress for instant responsive feedback
+    setProgress(12);
+
+    const startTime = Date.now();
+    const interval = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 96) {
+          // Asymptotically approach 98% while waiting
+          return Math.min(98, prev + 0.2);
+        }
+        if (prev >= 85) {
+          return Math.min(96, prev + 0.8);
+        }
+        if (prev >= 65) {
+          return Math.min(85, prev + 1.8);
+        }
+        if (prev >= 35) {
+          return Math.min(65, prev + 3.2);
+        }
+        return Math.min(35, prev + 4.5);
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [flowState]);
 
   // Real-time auth sync: clear auth error when user logs in
   useEffect(() => {
@@ -45,6 +82,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       }
     }
   }, [isAuthenticated, flowState, error, setFlowState]);
+
+  const activeWidth = flowState === 'enhancing' ? ENHANCING_BUTTON_WIDTH : BUTTON_WIDTH;
 
   const computePosition = useCallback(() => {
     const rect = adapter.getInputRect();
@@ -73,7 +112,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       }
     }
 
-    const x = containerRect.right - BUTTON_WIDTH;
+    const x = containerRect.right - activeWidth;
     const y = containerRect.top - BUTTON_HEIGHT - 6;
 
     if (
@@ -88,20 +127,16 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       return;
     }
 
-    const next = { x, y, width: BUTTON_WIDTH };
+    const next = { x, y, width: activeWidth };
     lastValidPosition.current = next;
     setPosition(next);
-  }, [adapter]);
+  }, [adapter, activeWidth]);
 
   useEffect(() => {
     computePosition();
 
-    // Rapid boot retries: snap the button into position within ~300ms of mount.
-    // These fire once and stop — they're just to handle cases where currentInput
-    // isn't yet set on the very first render tick.
     const bootTimers = [50, 150, 300].map((d) => setTimeout(computePosition, d));
 
-    // Use ResizeObserver for efficient tracking of input size changes
     let resizeObserver: ResizeObserver | null = null;
     const inputEl = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
     if (inputEl && typeof ResizeObserver !== 'undefined') {
@@ -111,8 +146,6 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       resizeObserver.observe(inputEl);
     }
 
-    // Long-term fallback: 2s interval (low frequency, no jank) to keep the
-    // button in sync if the input moves (e.g. ChatGPT adds composer toolbar).
     const fallbackInterval = setInterval(computePosition, 2000);
 
     window.addEventListener('scroll', computePosition, { passive: true });
@@ -159,17 +192,18 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     setFlowState('selecting');
   };
 
+  const handleCancelClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (onCancel) {
+      onCancel();
+    } else {
+      setFlowState('idle');
+    }
+  };
+
   const getButtonContent = () => {
     switch (flowState) {
-      case 'enhancing':
-        return (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#7C5CFC', fontWeight: 600, fontSize: 12 }}>
-            <span className="pe-spinner" style={{ display: 'inline-flex' }}>
-              <RoleIcon name="Loader2" size={15} strokeWidth={2.2} />
-            </span>
-            <span>Enhancing…</span>
-          </div>
-        );
       case 'injected':
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#10B981', fontWeight: 700, fontSize: 12 }}>
@@ -251,6 +285,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       errStr.includes('401') ||
       errStr.includes('unauthorized'));
 
+  const roundedPct = Math.round(progress);
+
   return (
     <AnimatePresence>
       <motion.div
@@ -269,13 +305,17 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
           display: 'flex',
           alignItems: 'center',
           height: BUTTON_HEIGHT,
-          padding: '3px 4px 3px 6px',
+          padding: flowState === 'enhancing' ? '3px 6px 3px 10px' : '3px 4px 3px 6px',
           borderRadius: '20px',
           background: '#FFFFFF',
-          border: '1px solid rgba(236, 233, 255, 0.9)',
-          boxShadow: '0 4px 16px rgba(124, 92, 252, 0.08), 0 2px 6px rgba(0,0,0,0.04)',
+          border: flowState === 'enhancing' ? '1px solid rgba(167, 139, 250, 0.6)' : '1px solid rgba(236, 233, 255, 0.9)',
+          boxShadow: flowState === 'enhancing'
+            ? '0 6px 20px rgba(124, 92, 252, 0.15), 0 2px 6px rgba(0,0,0,0.04)'
+            : '0 4px 16px rgba(124, 92, 252, 0.08), 0 2px 6px rgba(0,0,0,0.04)',
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           userSelect: 'none',
+          overflow: 'hidden',
+          minWidth: flowState === 'enhancing' ? ENHANCING_BUTTON_WIDTH : undefined,
         }}
       >
         {/* Floating Notification Banner if user is not logged in */}
@@ -358,110 +398,205 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
           </motion.div>
         )}
 
-        {/* Minimal Mode / Role Icon Button */}
-        <button
-          onClick={handleModeClick}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          disabled={flowState === 'enhancing'}
-          title="Choose Role & Mode"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            borderRadius: '14px',
-            background: 'transparent',
-            border: 'none',
-            color: '#A78BFA',
-            cursor: flowState === 'enhancing' ? 'not-allowed' : 'pointer',
-            opacity: flowState === 'enhancing' ? 0.5 : 1,
-            transition: 'all 0.15s ease',
-            padding: 0,
-          }}
-          onMouseEnter={(e) => {
-            if (flowState !== 'enhancing') {
-              e.currentTarget.style.background = '#F5F3FF';
-              e.currentTarget.style.color = '#7C5CFC';
-            }
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = '#A78BFA';
-          }}
-        >
-          <RoleIcon name="SlidersHorizontal" size={15} strokeWidth={1.8} />
-        </button>
+        {/* Enhancing State: Animated Percentage + Progress Bar + Cancel Button */}
+        {flowState === 'enhancing' ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', gap: 8 }}>
+            {/* Progress indicator & Percentage text */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+              <span className="pe-spinner" style={{ display: 'inline-flex', color: '#7C5CFC' }}>
+                <RoleIcon name="Loader2" size={14} strokeWidth={2.5} />
+              </span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: '#1E1B4B', letterSpacing: '-0.01em' }}>
+                Enhancing
+              </span>
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  fontFamily: 'monospace',
+                  color: '#7C5CFC',
+                  background: 'rgba(124, 92, 252, 0.09)',
+                  border: '1px solid rgba(124, 92, 252, 0.2)',
+                  padding: '1px 5px',
+                  borderRadius: '6px',
+                  minWidth: 32,
+                  textAlign: 'center',
+                }}
+              >
+                {roundedPct}%
+              </span>
+            </div>
 
-        {/* Minimal History Icon Button */}
-        <button
-          onClick={handleHistoryClick}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          title="History & Workspaces"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 28,
-            height: 28,
-            borderRadius: '14px',
-            background: 'transparent',
-            border: 'none',
-            color: '#A78BFA',
-            cursor: 'pointer',
-            transition: 'all 0.15s ease',
-            padding: 0,
-            marginRight: 4,
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = '#F5F3FF';
-            e.currentTarget.style.color = '#7C5CFC';
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent';
-            e.currentTarget.style.color = '#A78BFA';
-          }}
-        >
-          <RoleIcon name="History" size={15} strokeWidth={1.8} />
-        </button>
+            {/* Cancel Button */}
+            <button
+              onClick={handleCancelClick}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title="Cancel enhancing (or click if clicked by mistake)"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 3.5,
+                padding: '4px 8px',
+                borderRadius: '10px',
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#EF4444',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                flexShrink: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#EF4444';
+                e.currentTarget.style.color = '#FFFFFF';
+                e.currentTarget.style.borderColor = '#EF4444';
+                e.currentTarget.style.boxShadow = '0 2px 6px rgba(239, 68, 68, 0.3)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
+                e.currentTarget.style.color = '#EF4444';
+                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <RoleIcon name="X" size={11} strokeWidth={2.5} />
+              <span>Cancel</span>
+            </button>
+          </div>
+        ) : (
+          /* Normal State: Mode selector + History icon + Enhance button */
+          <>
+            {/* Minimal Mode / Role Icon Button */}
+            <button
+              onClick={handleModeClick}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title="Choose Role & Mode"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: '14px',
+                background: 'transparent',
+                border: 'none',
+                color: '#A78BFA',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                padding: 0,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#F5F3FF';
+                e.currentTarget.style.color = '#7C5CFC';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#A78BFA';
+              }}
+            >
+              <RoleIcon name="SlidersHorizontal" size={15} strokeWidth={1.8} />
+            </button>
 
-        {/* Vertical divider */}
-        <div style={{ width: 1, height: 16, background: '#ECE9FF', marginRight: 4 }} />
+            {/* Minimal History Icon Button */}
+            <button
+              onClick={handleHistoryClick}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              title="History & Workspaces"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 28,
+                height: 28,
+                borderRadius: '14px',
+                background: 'transparent',
+                border: 'none',
+                color: '#A78BFA',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+                padding: 0,
+                marginRight: 4,
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = '#F5F3FF';
+                e.currentTarget.style.color = '#7C5CFC';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+                e.currentTarget.style.color = '#A78BFA';
+              }}
+            >
+              <RoleIcon name="History" size={15} strokeWidth={1.8} />
+            </button>
 
-        {/* Main AURE / Enhance Orb Button */}
-        <button
-          onClick={handleMainClick}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-          }}
-          disabled={flowState === 'enhancing'}
-          onMouseEnter={() => setIsMainHovered(true)}
-          onMouseLeave={() => setIsMainHovered(false)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            height: 28,
-            padding: '0 10px',
-            borderRadius: '14px',
-            background: isMainHovered ? 'linear-gradient(135deg, #F3F0FF, #EDE9FE)' : 'transparent',
-            border: 'none',
-            cursor: flowState === 'enhancing' ? 'not-allowed' : 'pointer',
-            opacity: flowState === 'enhancing' ? 0.7 : 1,
-            transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          {getButtonContent()}
-        </button>
+            {/* Vertical divider */}
+            <div style={{ width: 1, height: 16, background: '#ECE9FF', marginRight: 4 }} />
+
+            {/* Main AURE / Enhance Orb Button */}
+            <button
+              onClick={handleMainClick}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onMouseEnter={() => setIsMainHovered(true)}
+              onMouseLeave={() => setIsMainHovered(false)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 28,
+                padding: '0 10px',
+                borderRadius: '14px',
+                background: isMainHovered ? 'linear-gradient(135deg, #F3F0FF, #EDE9FE)' : 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {getButtonContent()}
+            </button>
+          </>
+        )}
+
+        {/* Smooth Bottom Percentage Progress Bar */}
+        {flowState === 'enhancing' && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: 3,
+              background: 'rgba(124, 92, 252, 0.12)',
+              borderRadius: '0 0 20px 20px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                height: '100%',
+                background: 'linear-gradient(90deg, #7C5CFC 0%, #A78BFA 50%, #10B981 100%)',
+                width: `${roundedPct}%`,
+                transition: 'width 0.12s ease-out',
+                boxShadow: '0 0 8px rgba(124, 92, 252, 0.6)',
+              }}
+            />
+          </div>
+        )}
       </motion.div>
     </AnimatePresence>
   );
 };
+

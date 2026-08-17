@@ -15,6 +15,17 @@
   --aure-warning: #F59E0B;
 }
 
+/* ── Prevent text carets and unwanted text selection across UI ── */
+*, *::before, *::after {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+*:not(input):not(textarea):not([contenteditable="true"]):not([contenteditable=""]):not([contenteditable="plaintext-only"]) {
+  caret-color: transparent !important;
+}
+
 html, body, #root {
   width: 340px;
   height: auto;
@@ -28,6 +39,36 @@ html, body, #root {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  cursor: default;
+}
+
+/* Allow text selection and native blinking carets ONLY on editable fields and intentional selectable containers */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable=""],
+[contenteditable="plaintext-only"],
+.select-text,
+.select-text * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  caret-color: auto !important;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* Interactive elements get pointer cursor */
+button,
+a,
+[role="button"],
+.cursor-pointer,
+select,
+summary {
+  cursor: pointer;
 }
 
 /* Premium scrollbar */
@@ -47,3 +88,4 @@ html, body, #root {
   outline-offset: 2px;
   border-radius: 8px;
 }
+

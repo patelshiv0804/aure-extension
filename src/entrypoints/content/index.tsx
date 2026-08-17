@@ -106,9 +106,13 @@ export default defineContentScript({
 
     // Cleanup on context invalidation
     _ctx.onInvalidated(() => {
-      root.unmount();
-      appContainer.remove();
-      styleEl.remove();
+      try {
+        root.unmount();
+      } catch {}
+      try {
+        appContainer.remove();
+        styleEl.remove();
+      } catch {}
     });
   },
 });

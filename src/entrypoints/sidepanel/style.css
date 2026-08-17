@@ -13,6 +13,17 @@
   --aure-muted: #8E8EA0;
 }
 
+/* ── Prevent text carets and unwanted text selection across UI ── */
+*, *::before, *::after {
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+}
+
+*:not(input):not(textarea):not([contenteditable="true"]):not([contenteditable=""]):not([contenteditable="plaintext-only"]) {
+  caret-color: transparent !important;
+}
+
 html, body, #root {
   margin: 0;
   padding: 0;
@@ -22,6 +33,36 @@ html, body, #root {
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  cursor: default;
+}
+
+/* Allow text selection and native blinking carets ONLY on editable fields and intentional selectable containers */
+input,
+textarea,
+[contenteditable="true"],
+[contenteditable=""],
+[contenteditable="plaintext-only"],
+.select-text,
+.select-text * {
+  user-select: text !important;
+  -webkit-user-select: text !important;
+  caret-color: auto !important;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  cursor: text !important;
+}
+
+/* Interactive elements get pointer cursor */
+button,
+a,
+[role="button"],
+.cursor-pointer,
+select,
+summary {
+  cursor: pointer;
 }
 
 ::-webkit-scrollbar { width: 5px; }
@@ -33,3 +74,4 @@ html, body, #root {
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(124, 92, 252, 0.22);
 }
+

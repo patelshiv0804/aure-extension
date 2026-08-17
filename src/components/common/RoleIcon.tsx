@@ -91,6 +91,8 @@ interface RoleIconProps {
   className?: string;
   size?: number;
   strokeWidth?: number;
+  style?: React.CSSProperties;
+  onClick?: React.MouseEventHandler;
 }
 
 const ICON_MAP: Record<string, React.ComponentType<any>> = {
@@ -180,7 +182,9 @@ export const RoleIcon: React.FC<RoleIconProps> = ({
   className,
   size = 16,
   strokeWidth = 1.75,
+  style,
+  onClick,
 }) => {
   const Icon = ICON_MAP[name] || HelpCircle;
-  return <Icon className={className} size={size} strokeWidth={strokeWidth} />;
+  return <Icon className={className} size={size} strokeWidth={strokeWidth} style={style} onClick={onClick} />;
 };

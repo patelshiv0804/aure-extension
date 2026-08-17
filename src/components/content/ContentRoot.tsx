@@ -158,6 +158,15 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   }, [flowState, reset]);
 
   const isEnhancingRef = useRef(false);
+  const isCancelledRef = useRef(false);
+
+  const handleCancelEnhance = useCallback(() => {
+    isCancelledRef.current = true;
+    isEnhancingRef.current = false;
+    setFlowState('idle');
+    useEnhanceStore.getState().setError(null);
+    console.log('[AURE] Prompt enhancement cancelled by user');
+  }, [setFlowState]);
 
   const triggerEnhance = useCallback(
     async (mode: EnhancementMode, role?: string, roleMode?: string) => {
@@ -181,6 +190,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
       // Mark as enhancing immediately (synchronous lock before any await)
       isEnhancingRef.current = true;
+      isCancelledRef.current = false;
       setFlowState('enhancing');
       useEnhanceStore.getState().setError(null);
       setCurrentPrompt(prompt);
@@ -191,10 +201,13 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
       try {
         // Check login status before calling backend API
         await useAuthStore.getState().loadAuth();
+        if (isCancelledRef.current) return;
+
         const { isAuthenticated, user } = useAuthStore.getState();
         const cachedProfile = await getStorage('userProfile');
 
         if (!isAuthenticated && !user && !cachedProfile) {
+          if (isCancelledRef.current) return;
           useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
           setFlowState('error');
           // Open workspace sidepanel automatically for quick login
@@ -216,6 +229,12 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
             currentModel: adapter.getPlatformName().toLowerCase(),
           }),
         ]);
+
+        // If user pressed Cancel while waiting for network, discard results completely
+        if (isCancelledRef.current) {
+          console.log('[AURE] Enhancement completed after user cancelled. Discarding output.');
+          return;
+        }
 
         if (result.status === 'fulfilled') {
           setEnhanceResult(result.value);
@@ -241,6 +260,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           setRecommendation(recommendation.value);
         }
       } catch (error) {
+        if (isCancelledRef.current) return;
         const message = error instanceof Error ? error.message : 'Enhancement failed';
         useEnhanceStore.getState().setError(message);
         setFlowState('error');
@@ -281,6 +301,14 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const [activeVersionNumber, setActiveVersionNumber] = useState<number>(1);
   const [isReenhancing, setIsReenhancing] = useState(false);
   const isReenhancingRef = useRef(false);
+  const isReenhanceCancelledRef = useRef(false);
+
+  const handleCancelReenhance = useCallback(() => {
+    isReenhanceCancelledRef.current = true;
+    isReenhancingRef.current = false;
+    setIsReenhancing(false);
+    console.log('[AURE] Re-enhancement cancelled by user');
+  }, []);
 
   const handleSelectVersion = useCallback(
     async (verNum: number) => {
@@ -299,6 +327,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const handleReenhance = useCallback(async () => {
     if (isReenhancingRef.current) return;
     isReenhancingRef.current = true;
+    isReenhanceCancelledRef.current = false;
     setIsReenhancing(true);
 
     try {
@@ -312,6 +341,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         mode,
         platform: adapter.getPlatformName(),
       });
+
+      if (isReenhanceCancelledRef.current) {
+        console.log('[AURE] Re-enhancement completed after user cancelled. Discarding output.');
+        return;
+      }
 
       if (result && result.enhancedPrompt) {
         setEnhanceResult(result);
@@ -334,6 +368,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         });
       }
     } catch (err) {
+      if (isReenhanceCancelledRef.current) return;
       console.error('[AURE] Failed to re-enhance prompt:', err);
     } finally {
       isReenhancingRef.current = false;
@@ -381,6 +416,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           adapter={adapter}
           onEnhance={handleEnhanceClick}
           onOpenHistory={handleOpenHistory}
+          onCancel={handleCancelEnhance}
         />
       )}
 
@@ -397,6 +433,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           onUndo={handleUndo}
           onReapply={handleReapply}
           onReenhance={handleReenhance}
+          onCancelReenhance={handleCancelReenhance}
           isReenhancing={isReenhancing}
           versions={versionHistory}
           currentVersionNumber={activeVersionNumber}
