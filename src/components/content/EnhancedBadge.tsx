@@ -26,6 +26,8 @@ interface EnhancedBadgeProps {
   versions?: PromptVersionItem[];
   currentVersionNumber?: number;
   onSelectVersion?: (versionNumber: number) => void;
+  onSave?: () => void;
+  isSaved?: boolean;
 }
 
 export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
@@ -40,6 +42,8 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   versions = [],
   currentVersionNumber = 2,
   onSelectVersion,
+  onSave,
+  isSaved = false,
 }) => {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -433,6 +437,53 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           >
             <RoleIcon name="RotateCcw" size={12} strokeWidth={2.2} />
             <span>Undo</span>
+          </button>
+        )}
+
+        {/* Explicit Save to Vault Button */}
+        {onSave && !isReenhancing && (
+          <button
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onSave();
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+            disabled={isSaved}
+            title={isSaved ? 'Saved to vault & history' : 'Save this enhanced prompt to your vault'}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              height: 26,
+              padding: '0 9px',
+              borderRadius: 13,
+              background: isSaved ? '#ECFDF5' : '#F8FAFC',
+              border: isSaved ? '1px solid #10B981' : '1px solid rgba(203, 213, 225, 0.8)',
+              color: isSaved ? '#059669' : '#475569',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: isSaved ? 'default' : 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              if (!isSaved) {
+                e.currentTarget.style.background = '#F1F5F9';
+                e.currentTarget.style.color = '#1E293B';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isSaved) {
+                e.currentTarget.style.background = '#F8FAFC';
+                e.currentTarget.style.color = '#475569';
+              }
+            }}
+          >
+            <RoleIcon name={isSaved ? 'Check' : 'Bookmark'} size={12} strokeWidth={2.2} />
+            <span>{isSaved ? 'Saved' : 'Save'}</span>
           </button>
         )}
 

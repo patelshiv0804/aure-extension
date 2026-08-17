@@ -19,7 +19,14 @@ interface FloatingEnhanceButtonProps {
 
 const BUTTON_HEIGHT = 36;
 const BUTTON_WIDTH = 175;
-const ENHANCING_BUTTON_WIDTH = 240;
+const ENHANCING_BUTTON_WIDTH = 265;
+
+const getEnhanceStage = (pct: number) => {
+  if (pct < 25) return 'Matching Template';
+  if (pct < 65) return 'Optimizing Prompt';
+  if (pct < 85) return 'Analyzing Quality';
+  return 'Finalizing';
+};
 
 export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   adapter,
@@ -32,6 +39,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   const [position, setPosition] = useState<{ x: number; y: number; width: number } | null>(null);
   const [isMainHovered, setIsMainHovered] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [stageLabel, setStageLabel] = useState('Initializing');
   const buttonRef = useRef<HTMLDivElement>(null);
   const lastValidPosition = useRef<{ x: number; y: number; width: number } | null>(null);
 
@@ -39,37 +47,39 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     loadAuth();
   }, [loadAuth]);
 
-  // Smooth realistic percentage progress animation while enhancing
+  // Real-time backend SSE progress listener (10%, 25%, 55%, 80%, 95%, 100%)
   useEffect(() => {
     if (flowState !== 'enhancing') {
       setProgress(0);
+      setStageLabel('Initializing');
       return;
     }
 
-    // Immediately kick off with 12% progress for instant responsive feedback
-    setProgress(12);
+    // Initial starting progress
+    setProgress(10);
+    setStageLabel('Analyzing Requirements');
 
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 96) {
-          // Asymptotically approach 98% while waiting
-          return Math.min(98, prev + 0.2);
+    const messageListener = (message: any) => {
+      if (message && message.type === 'ENHANCE_PROGRESS' && message.payload) {
+        const { progress: realProgress, stage, message: stepMessage } = message.payload;
+        if (typeof realProgress === 'number') {
+          setProgress(realProgress);
         }
-        if (prev >= 85) {
-          return Math.min(96, prev + 0.8);
+        if (stepMessage) {
+          setStageLabel(stepMessage);
+        } else if (stage) {
+          if (stage === 'INIT') setStageLabel('Analyzing Requirements');
+          else if (stage === 'TEMPLATE') setStageLabel('Matching Template');
+          else if (stage === 'OPTIMIZING') setStageLabel('Optimizing Prompt');
+          else if (stage === 'SCORING') setStageLabel('Scoring Quality');
+          else if (stage === 'COMPARING') setStageLabel('Finalizing Analysis');
+          else if (stage === 'COMPLETE') setStageLabel('Complete');
         }
-        if (prev >= 65) {
-          return Math.min(85, prev + 1.8);
-        }
-        if (prev >= 35) {
-          return Math.min(65, prev + 3.2);
-        }
-        return Math.min(35, prev + 4.5);
-      });
-    }, 100);
+      }
+    };
 
-    return () => clearInterval(interval);
+    chrome.runtime.onMessage.addListener(messageListener);
+    return () => chrome.runtime.onMessage.removeListener(messageListener);
   }, [flowState]);
 
   // Real-time auth sync: clear auth error when user logs in
@@ -406,8 +416,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
               <span className="pe-spinner" style={{ display: 'inline-flex', color: '#7C5CFC' }}>
                 <RoleIcon name="Loader2" size={14} strokeWidth={2.5} />
               </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: '#1E1B4B', letterSpacing: '-0.01em' }}>
-                Enhancing
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#1E1B4B', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+                {stageLabel}
               </span>
               <span
                 style={{

@@ -5,7 +5,7 @@
 
 import { initMessageListener, onMessage } from '@/lib/messaging';
 import { migrateStorageIfNeeded, getSettings, updateSettings } from '@/lib/storage';
-import { enhancePrompt, reenhancePrompt } from '@/api/enhance';
+import { enhancePrompt, enhancePromptStream, reenhancePrompt, saveEnhancedPrompt } from '@/api/enhance';
 import { saveVersion, getVersions } from '@/api/versions';
 import { getPromptHistory, deletePrompt } from '@/api/history';
 import { recommendModel } from '@/api/recommend';
@@ -19,37 +19,113 @@ export default defineBackground(() => {
   // Initialize the message router
   initMessageListener();
 
+  // ── Active Request Abort Controllers ───────────────────────
+  let activeEnhanceController: AbortController | null = null;
+  let activeReenhanceController: AbortController | null = null;
+
   // ── Message Handlers ────────────────────────────────────────
 
-  onMessage('ENHANCE_PROMPT', async (payload) => {
-    const result = await enhancePrompt({
-      prompt: payload.prompt,
-      mode: payload.mode,
-      role: payload.role,
-      context: { platform: payload.platform },
-    });
+  onMessage('ENHANCE_PROMPT', async (payload, sender) => {
+    // If a previous enhance request was running, cancel it
+    if (activeEnhanceController) {
+      activeEnhanceController.abort('New enhance request started');
+    }
+    activeEnhanceController = new AbortController();
+    const currentController = activeEnhanceController;
 
-    // Notify all open extension windows (sidepanel, popup, etc.) to refresh history immediately
     try {
-      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: result }).catch(() => {});
+      const result = await enhancePromptStream(
+        {
+          prompt: payload.prompt,
+          mode: payload.mode,
+          role: payload.role,
+          context: { platform: payload.platform },
+        },
+        (progress, stage, message) => {
+          if (sender.tab?.id) {
+            chrome.tabs.sendMessage(sender.tab.id, {
+              type: 'ENHANCE_PROGRESS',
+              payload: { progress, stage, message },
+            }).catch(() => {});
+          }
+        },
+        currentController.signal
+      );
+
+      if (currentController.signal.aborted) {
+        throw new Error('Enhancement cancelled');
+      }
+
+      return result;
+    } catch (err: any) {
+      if (currentController.signal.aborted || err?.code === 'CANCELLED' || err?.name === 'AbortError') {
+        console.log('[AURE Background] Enhancement request cleanly aborted.');
+        throw new Error('Enhancement cancelled');
+      }
+      throw err;
+    } finally {
+      if (activeEnhanceController === currentController) {
+        activeEnhanceController = null;
+      }
+    }
+  });
+
+  onMessage('SAVE_ENHANCED_PROMPT', async (payload) => {
+    const result = await saveEnhancedPrompt(payload);
+    try {
+      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: result.prompt_id } }).catch(() => {});
       chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
     } catch {}
-
-    return result;
+    return { success: result.success, prompt_id: result.prompt_id };
   });
 
   onMessage('REENHANCE_PROMPT', async (payload) => {
-    const result = await reenhancePrompt(payload.promptId, {
-      prompt: payload.prompt || '',
-      mode: payload.mode || 'general',
-    });
+    if (activeReenhanceController) {
+      activeReenhanceController.abort('New reenhance request started');
+    }
+    activeReenhanceController = new AbortController();
+    const currentController = activeReenhanceController;
 
     try {
-      chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: result }).catch(() => {});
-      chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
-    } catch {}
+      const result = await reenhancePrompt(
+        payload.promptId,
+        {
+          prompt: payload.prompt || '',
+          mode: payload.mode || 'general',
+        },
+        currentController.signal
+      );
 
-    return result;
+      if (currentController.signal.aborted) {
+        console.log('[AURE Background] Re-enhancement was aborted by user.');
+        throw new Error('Re-enhancement cancelled');
+      }
+
+      return result;
+    } catch (err: any) {
+      if (currentController.signal.aborted || err?.code === 'CANCELLED' || err?.name === 'AbortError') {
+        console.log('[AURE Background] Re-enhancement request cleanly aborted.');
+        throw new Error('Re-enhancement cancelled');
+      }
+      throw err;
+    } finally {
+      if (activeReenhanceController === currentController) {
+        activeReenhanceController = null;
+      }
+    }
+  });
+
+  onMessage('CANCEL_ENHANCE', async () => {
+    console.log('[AURE Background] CANCEL_ENHANCE received. Aborting active network stream.');
+    if (activeEnhanceController) {
+      activeEnhanceController.abort('User cancelled enhancement');
+      activeEnhanceController = null;
+    }
+    if (activeReenhanceController) {
+      activeReenhanceController.abort('User cancelled re-enhancement');
+      activeReenhanceController = null;
+    }
+    return { success: true };
   });
 
   onMessage('SAVE_VERSION', async (payload) => {

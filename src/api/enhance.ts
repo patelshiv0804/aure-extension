@@ -1,22 +1,153 @@
-// ──────────────────────────────────────────────────────────────
-// Enhance API — POST /enhance
-// ──────────────────────────────────────────────────────────────
-
-import { apiRequest } from './client';
+import { apiRequest, apiStreamRequest } from './client';
 import { enhanceCache, historyCache } from '@/lib/cache';
 import { formatPromptText } from '@/lib/formatter';
 import type { EnhanceApiRequest, EnhanceApiResponse } from './types';
 import type { EnhanceResult, PromptCategory, EnhancementMode } from '@/types/enhancement';
 import { MODEL_MAP, AI_MODELS } from '@/constants/models';
 
+export interface EnhanceProgressCallback {
+  (progress: number, stage: string, message: string): void;
+}
+
+/**
+ * Call the streaming enhancement API (POST /enhance/stream) with real-time SSE progress.
+ * Does NOT persist to database automatically.
+ */
+export async function enhancePromptStream(
+  request: EnhanceApiRequest,
+  onProgress: EnhanceProgressCallback,
+  signal?: AbortSignal
+): Promise<EnhanceResult> {
+  let finalResult: EnhanceResult | null = null;
+  let streamError: Error | null = null;
+
+  await apiStreamRequest(
+    {
+      method: 'POST',
+      path: '/enhance/stream',
+      body: {
+        prompt: request.prompt,
+        role: request.role ?? request.mode,
+        mode: request.mode,
+        variables: request.variables,
+        apply_style: request.apply_style,
+        style_profile_id: request.style_profile_id,
+        auto_save: false,
+      },
+      rateLimitKey: 'enhance',
+      timeout: 90_000,
+      signal,
+    },
+    ({ event, data }) => {
+      if (event === 'progress' && data) {
+        onProgress(data.progress ?? 0, data.stage ?? 'PROCESSING', data.message ?? 'Processing...');
+      } else if (event === 'complete' && data) {
+        const backendData = data.data ?? data;
+        const formattedOriginal = formatPromptText(backendData.original_prompt || request.prompt);
+        const formattedEnhanced = formatPromptText(backendData.enhanced_prompt || '');
+        const originalWords = formattedOriginal.split(/\s+/).filter(Boolean).length;
+        const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
+        const origAnalysis = (backendData.original_analysis ?? backendData.analysis) as any;
+        const enhAnalysis = backendData.enhanced_analysis as any;
+
+        const beforeScore = normalizeScore(
+          origAnalysis?.overall_score ?? backendData.comparison?.before_score ?? backendData.analysis?.overall_score ?? 0
+        );
+        const afterScore = normalizeScore(
+          enhAnalysis?.overall_score ?? backendData.comparison?.after_score ?? beforeScore
+        );
+        const improvementScore = Math.max(0, afterScore - beforeScore);
+
+        const rawTools = backendData.tool_recommendations?.tools ?? [];
+        const toolRecs = rawTools.map((t: any) => {
+          const name = t.name ?? 'AI Tool';
+          const info = MODEL_MAP[name.toLowerCase()] ?? AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
+          return {
+            name,
+            rank: t.rank ?? 1,
+            url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
+          };
+        });
+
+        finalResult = {
+          promptId: backendData.version?.prompt_id ?? undefined,
+          originalPrompt: formattedOriginal,
+          enhancedPrompt: formattedEnhanced,
+          mode: request.mode,
+          metrics: {
+            clarity: afterScore,
+            specificity: Math.min(100, afterScore + Math.round(improvementScore / 2)),
+            context: Math.min(100, afterScore + Math.round(improvementScore / 3)),
+            successProbability: afterScore,
+            wordCountOriginal: originalWords,
+            wordCountEnhanced: enhancedWords,
+            tokenCountOriginal: Math.ceil(originalWords * 1.3),
+            tokenCountEnhanced: Math.ceil(enhancedWords * 1.3),
+            readabilityOriginal: beforeScore,
+            readabilityEnhanced: afterScore,
+          },
+          category: detectCategory(formattedOriginal),
+          suggestions: backendData.comparison?.improvements ?? [],
+          timestamp: Date.now(),
+          originalAnalysis: origAnalysis,
+          enhancedAnalysis: enhAnalysis,
+          toolRecommendations: toolRecs,
+        };
+        onProgress(100, 'COMPLETE', 'Prompt enhanced successfully');
+      } else if (event === 'error' && data) {
+        streamError = new Error(data.error ?? 'Enhancement stream failed');
+      }
+    }
+  );
+
+  if (signal?.aborted) {
+    throw new Error('Enhancement cancelled by user');
+  }
+
+  if (streamError) {
+    throw streamError;
+  }
+
+  if (!finalResult) {
+    throw new Error('Streaming completed without enhanced result');
+  }
+
+  return finalResult;
+}
+
+/**
+ * Explicitly save an enhanced prompt to the database vault.
+ */
+export async function saveEnhancedPrompt(data: {
+  original_prompt: string;
+  enhanced_prompt: string;
+  template_id?: string;
+  title?: string;
+  old_analysis?: any;
+  new_analysis?: any;
+  grade?: string;
+  tool_recommendations?: any;
+  role?: string;
+  mode?: string;
+}): Promise<{ success: boolean; prompt_id: string }> {
+  const response = await apiRequest<{ success: boolean; message: string; prompt_id: string }>({
+    method: 'POST',
+    path: '/save',
+    body: data,
+    rateLimitKey: 'save',
+  });
+  historyCache.clear();
+  return { success: response.success, prompt_id: response.prompt_id };
+}
+
 /**
  * Call the enhancement API to improve a prompt.
  * Results are cached by prompt+mode for 10 minutes.
  */
-export async function enhancePrompt(request: EnhanceApiRequest): Promise<EnhanceResult> {
+export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSignal): Promise<EnhanceResult> {
   const cacheKey = `enhance:${request.mode}:${request.prompt}`;
   const cached = enhanceCache.get(cacheKey) as EnhanceResult | undefined;
-  if (cached) return cached;
+  if (cached && !signal?.aborted) return cached;
 
   const response = await apiRequest<EnhanceApiResponse>({
     method: 'POST',
@@ -28,9 +159,11 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
       variables: request.variables,
       apply_style: request.apply_style,
       style_profile_id: request.style_profile_id,
+      auto_save: false,
     },
     rateLimitKey: 'enhance',
     timeout: 90_000,
+    signal,
   });
 
   const backendData = response.data;
@@ -136,7 +269,8 @@ export async function enhancePrompt(request: EnhanceApiRequest): Promise<Enhance
  */
 export async function reenhancePrompt(
   promptId: string,
-  fallback?: { prompt: string; mode: EnhancementMode; role?: string }
+  fallback?: { prompt: string; mode: EnhancementMode; role?: string },
+  signal?: AbortSignal
 ): Promise<EnhanceResult> {
   if (promptId) {
     try {
@@ -159,6 +293,7 @@ export async function reenhancePrompt(
         body: {},
         rateLimitKey: 'enhance',
         timeout: 90_000,
+        signal,
       });
 
       const backendData = response.data;

@@ -21,6 +21,25 @@ export interface MessageMap {
     payload: { promptId: string; prompt?: string; mode?: EnhancementMode; platform?: string };
     response: EnhanceResult;
   };
+  CANCEL_ENHANCE: {
+    payload: { promptId?: string };
+    response: { success: boolean };
+  };
+  SAVE_ENHANCED_PROMPT: {
+    payload: {
+      original_prompt: string;
+      enhanced_prompt: string;
+      template_id?: string;
+      title?: string;
+      old_analysis?: any;
+      new_analysis?: any;
+      grade?: string;
+      tool_recommendations?: any;
+      role?: string;
+      mode?: string;
+    };
+    response: { success: boolean; prompt_id: string };
+  };
 
   // Versioning
   SAVE_VERSION: {

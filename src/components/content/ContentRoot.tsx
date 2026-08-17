@@ -31,6 +31,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     setFlowState,
     showButton,
     setShowButton,
+    currentPrompt,
     setCurrentPrompt,
     setActiveInput,
     setSuggestions,
@@ -165,8 +166,9 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     isEnhancingRef.current = false;
     setFlowState('idle');
     useEnhanceStore.getState().setError(null);
-    console.log('[AURE] Prompt enhancement cancelled by user');
-  }, [setFlowState]);
+    sendMessage('CANCEL_ENHANCE', { promptId: enhanceResult?.promptId }).catch(() => {});
+    console.log('[AURE] Prompt enhancement cancelled by user — aborted backend API');
+  }, [setFlowState, enhanceResult]);
 
   const triggerEnhance = useCallback(
     async (mode: EnhancementMode, role?: string, roleMode?: string) => {
@@ -252,6 +254,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
             { versionNumber: 1, text: result.value.enhancedPrompt, label: 'v1-enhanced' },
           ]);
           setActiveVersionNumber(1);
+          setIsPromptSaved(false);
         } else {
           throw new Error(result.reason?.message ?? 'Enhancement failed');
         }
@@ -299,16 +302,39 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
   const [versionHistory, setVersionHistory] = useState<PromptVersionItem[]>([]);
   const [activeVersionNumber, setActiveVersionNumber] = useState<number>(1);
+  const [isPromptSaved, setIsPromptSaved] = useState<boolean>(false);
   const [isReenhancing, setIsReenhancing] = useState(false);
   const isReenhancingRef = useRef(false);
   const isReenhanceCancelledRef = useRef(false);
+
+  const handleSavePrompt = useCallback(async () => {
+    if (!enhanceResult || isPromptSaved) return;
+    try {
+      const activeText = adapterRef.current.extractPrompt() || enhanceResult.enhancedPrompt;
+      const res = await sendMessage('SAVE_ENHANCED_PROMPT', {
+        original_prompt: enhanceResult.originalPrompt || currentPrompt,
+        enhanced_prompt: activeText,
+        old_analysis: enhanceResult.originalAnalysis,
+        new_analysis: enhanceResult.enhancedAnalysis,
+        tool_recommendations: { tools: enhanceResult.toolRecommendations },
+        role: useEnhanceStore.getState().selectedRole || 'General',
+        mode: useEnhanceStore.getState().selectedMode || enhanceResult.mode || 'general',
+      });
+      if (res.success) {
+        setIsPromptSaved(true);
+      }
+    } catch (err) {
+      console.error('[AURE] Failed to save prompt to vault:', err);
+    }
+  }, [enhanceResult, isPromptSaved, currentPrompt]);
 
   const handleCancelReenhance = useCallback(() => {
     isReenhanceCancelledRef.current = true;
     isReenhancingRef.current = false;
     setIsReenhancing(false);
-    console.log('[AURE] Re-enhancement cancelled by user');
-  }, []);
+    sendMessage('CANCEL_ENHANCE', { promptId: enhanceResult?.promptId }).catch(() => {});
+    console.log('[AURE] Re-enhancement cancelled by user — aborted backend API');
+  }, [enhanceResult]);
 
   const handleSelectVersion = useCallback(
     async (verNum: number) => {
@@ -353,6 +379,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         await adapterRef.current.injectPrompt(cleanText);
         setIsUndone(false);
         setFlowState('injected');
+        setIsPromptSaved(false);
 
         setVersionHistory((prev) => {
           const nextNum = prev.length;
@@ -425,7 +452,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         <EnhancementModePanel adapter={adapter} onSelectMode={triggerEnhance} />
       )}
 
-      {/* In-Place Enhanced Badge (Version Dropdown / Undo / Re-enhance) */}
+      {/* In-Place Enhanced Badge (Version Dropdown / Undo / Re-enhance / Save) */}
       {(flowState === 'injected' || flowState === 'comparing') && enhanceResult && (
         <EnhancedBadge
           adapter={adapter}
@@ -438,6 +465,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           versions={versionHistory}
           currentVersionNumber={activeVersionNumber}
           onSelectVersion={handleSelectVersion}
+          onSave={handleSavePrompt}
+          isSaved={isPromptSaved}
           onDismiss={() => {
             setVersionHistory([]);
             reset();

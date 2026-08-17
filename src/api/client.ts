@@ -27,6 +27,7 @@ interface RequestConfig {
   timeout?: number;
   rateLimitKey?: string;
   retries?: number;
+  signal?: AbortSignal;
 }
 
 const DEFAULT_TIMEOUT = 120_000;
@@ -102,6 +103,10 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
   const retries = config.retries ?? MAX_RETRIES;
 
   for (let attempt = 0; attempt <= retries; attempt++) {
+    if (config.signal?.aborted) {
+      throw new ApiError('Request cancelled by user', 499, 'CANCELLED');
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(
@@ -109,15 +114,29 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
         config.timeout ?? DEFAULT_TIMEOUT
       );
 
-      const response = await fetch(url, {
-        method: config.method,
-        headers,
-        body: config.body ? (isFormBody ? (config.body as BodyInit) : JSON.stringify(config.body)) : undefined,
-        credentials: 'include',
-        signal: controller.signal,
-      });
+      const onUserAbort = () => {
+        controller.abort(config.signal?.reason || 'User cancelled');
+      };
 
-      clearTimeout(timeoutId);
+      if (config.signal) {
+        config.signal.addEventListener('abort', onUserAbort, { once: true });
+      }
+
+      let response: Response;
+      try {
+        response = await fetch(url, {
+          method: config.method,
+          headers,
+          body: config.body ? (isFormBody ? (config.body as BodyInit) : JSON.stringify(config.body)) : undefined,
+          credentials: 'include',
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timeoutId);
+        if (config.signal) {
+          config.signal.removeEventListener('abort', onUserAbort);
+        }
+      }
 
       if (!response.ok) {
         const errorBody = await response.text().catch(() => '');
@@ -136,7 +155,7 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
         }
 
         // Retry on 429 and 5xx
-        if (attempt < retries) {
+        if (attempt < retries && !config.signal?.aborted) {
           const delay = response.status === 429
             ? parseInt(response.headers.get('Retry-After') ?? '5') * 1000
             : RETRY_BASE_DELAY * Math.pow(2, attempt);
@@ -151,6 +170,10 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
     } catch (error) {
       if (error instanceof ApiError) throw error;
 
+      if (config.signal?.aborted) {
+        throw new ApiError('Request cancelled by user', 499, 'CANCELLED');
+      }
+
       if (error instanceof DOMException && error.name === 'AbortError') {
         if (attempt < retries) {
           await sleep(RETRY_BASE_DELAY * Math.pow(2, attempt));
@@ -159,7 +182,7 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
         throw new ApiError('Request timed out', 408, 'TIMEOUT');
       }
 
-      if (attempt < retries) {
+      if (attempt < retries && !config.signal?.aborted) {
         await sleep(RETRY_BASE_DELAY * Math.pow(2, attempt));
         continue;
       }
@@ -173,6 +196,109 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
   }
 
   throw new ApiError('Max retries exceeded', 0, 'MAX_RETRIES');
+}
+
+export interface StreamEvent {
+  event: string;
+  data: any;
+}
+
+/**
+ * Make an authenticated SSE Streaming API request with real-time event dispatching.
+ */
+export async function apiStreamRequest(
+  config: RequestConfig,
+  onEvent: (event: StreamEvent) => void
+): Promise<void> {
+  const baseUrl = await getBaseUrl();
+  const token = await getApiToken();
+  const storedEmail = await getStorage('currentUserEmail');
+  const profile = await getStorage('userProfile');
+  const currentUserEmail =
+    typeof storedEmail === 'string' && storedEmail.trim() ? storedEmail.trim() : profile?.email;
+
+  let url = `${baseUrl}${config.path}`;
+  if (config.params) {
+    const searchParams = new URLSearchParams(config.params);
+    url += `?${searchParams.toString()}`;
+  }
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'text/event-stream',
+    ...config.headers,
+  };
+
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  if (currentUserEmail) headers['X-Current-User'] = currentUserEmail;
+
+  if (config.signal?.aborted) {
+    throw new ApiError('Request cancelled by user', 499, 'CANCELLED');
+  }
+
+  const response = await fetch(url, {
+    method: config.method,
+    headers,
+    body: config.body ? JSON.stringify(config.body) : undefined,
+    credentials: 'include',
+    signal: config.signal,
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    let errorMessage = `API error: ${response.status}`;
+    try {
+      const parsed = JSON.parse(errorBody);
+      errorMessage = parsed.detail ?? parsed.message ?? parsed.error ?? errorMessage;
+    } catch {}
+    throw new ApiError(errorMessage, response.status);
+  }
+
+  if (!response.body) {
+    throw new ApiError('No response body for streaming request', 500);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  try {
+    while (true) {
+      if (config.signal?.aborted) {
+        await reader.cancel();
+        throw new ApiError('Request cancelled by user', 499, 'CANCELLED');
+      }
+
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      let currentEvent = 'message';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        if (trimmed.startsWith('event:')) {
+          currentEvent = trimmed.slice(6).trim();
+        } else if (trimmed.startsWith('data:')) {
+          const rawData = trimmed.slice(5).trim();
+          try {
+            const parsedData = JSON.parse(rawData);
+            onEvent({ event: currentEvent, data: parsedData });
+          } catch {
+            onEvent({ event: currentEvent, data: rawData });
+          }
+        }
+      }
+    }
+  } catch (err) {
+    if (config.signal?.aborted) {
+      throw new ApiError('Request cancelled by user', 499, 'CANCELLED');
+    }
+    throw err;
+  }
 }
 
 function sleep(ms: number): Promise<void> {
