@@ -14,7 +14,6 @@ interface FloatingEnhanceButtonProps {
   adapter: SiteAdapter;
   onEnhance: () => void;
   onOpenHistory?: () => void;
-  onCancel?: () => void;
 }
 
 const BUTTON_HEIGHT = 36;
@@ -32,7 +31,6 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   adapter,
   onEnhance,
   onOpenHistory,
-  onCancel,
 }) => {
   const { flowState, setFlowState, error } = useEnhanceStore();
   const { isAuthenticated, loadAuth } = useAuthStore();
@@ -209,15 +207,6 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     setFlowState('selecting');
   };
 
-  const handleCancelClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (onCancel) {
-      onCancel();
-    } else {
-      setFlowState('idle');
-    }
-  };
 
   const getButtonContent = () => {
     switch (flowState) {
@@ -444,47 +433,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
                 {roundedPct}%
               </span>
             </div>
-
-            {/* Cancel Button */}
-            <button
-              onClick={handleCancelClick}
-              onMouseDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              title="Cancel enhancing (or click if clicked by mistake)"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 3.5,
-                padding: '4px 8px',
-                borderRadius: '10px',
-                background: 'rgba(239, 68, 68, 0.08)',
-                border: '1px solid rgba(239, 68, 68, 0.25)',
-                color: '#EF4444',
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-                flexShrink: 0,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#EF4444';
-                e.currentTarget.style.color = '#FFFFFF';
-                e.currentTarget.style.borderColor = '#EF4444';
-                e.currentTarget.style.boxShadow = '0 2px 6px rgba(239, 68, 68, 0.3)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-                e.currentTarget.style.color = '#EF4444';
-                e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.25)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <RoleIcon name="X" size={11} strokeWidth={2.5} />
-              <span>Cancel</span>
-            </button>
-          </div>
+          
+        </div>
         ) : (
           /* Normal State: Mode selector + History icon + Enhance button */
           <>

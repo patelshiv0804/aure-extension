@@ -20,14 +20,11 @@ interface EnhancedBadgeProps {
   onUndo: () => void;
   onReapply: () => void;
   onReenhance?: () => void;
-  onCancelReenhance?: () => void;
   isReenhancing?: boolean;
   onDismiss: () => void;
   versions?: PromptVersionItem[];
   currentVersionNumber?: number;
   onSelectVersion?: (versionNumber: number) => void;
-  onSave?: () => void;
-  isSaved?: boolean;
 }
 
 export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
@@ -36,14 +33,11 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   onUndo,
   onReapply,
   onReenhance,
-  onCancelReenhance,
   isReenhancing = false,
   onDismiss,
   versions = [],
   currentVersionNumber = 2,
   onSelectVersion,
-  onSave,
-  isSaved = false,
 }) => {
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -178,7 +172,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           alignItems: 'center',
           gap: 6,
           height: 36,
-          padding: '0 12px 0 10px',
+          padding: '0 8px',
           borderRadius: 18,
           background: '#FFFFFF',
           border: '1px solid #ECE9FF',
@@ -187,31 +181,6 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           userSelect: 'none',
         }}
       >
-        {/* ✨ Enhanced / Undone Label */}
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 5,
-            paddingRight: 8,
-            borderRight: '1px solid #ECE9FF',
-          }}
-        >
-          <span style={{ fontSize: 13, color: isUndone ? '#64748B' : '#7C5CFC' }}>
-            {isUndone ? '↩' : '✨'}
-          </span>
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              color: isUndone ? '#64748B' : '#7C5CFC',
-              letterSpacing: '-0.01em',
-            }}
-          >
-            {isUndone ? 'Original' : 'Enhanced'}
-          </span>
-        </div>
-
         {/* Version Dropdown (when multiple versions exist) OR Standard Undo Button */}
         {hasMultipleVersions ? (
           <div ref={dropdownRef} style={{ position: 'relative' }}>
@@ -440,53 +409,6 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           </button>
         )}
 
-        {/* Explicit Save to Vault Button */}
-        {onSave && !isReenhancing && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onSave();
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            disabled={isSaved}
-            title={isSaved ? 'Saved to vault & history' : 'Save this enhanced prompt to your vault'}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 4,
-              height: 26,
-              padding: '0 9px',
-              borderRadius: 13,
-              background: isSaved ? '#ECFDF5' : '#F8FAFC',
-              border: isSaved ? '1px solid #10B981' : '1px solid rgba(203, 213, 225, 0.8)',
-              color: isSaved ? '#059669' : '#475569',
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: isSaved ? 'default' : 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              if (!isSaved) {
-                e.currentTarget.style.background = '#F1F5F9';
-                e.currentTarget.style.color = '#1E293B';
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!isSaved) {
-                e.currentTarget.style.background = '#F8FAFC';
-                e.currentTarget.style.color = '#475569';
-              }
-            }}
-          >
-            <RoleIcon name={isSaved ? 'Check' : 'Bookmark'} size={12} strokeWidth={2.2} />
-            <span>{isSaved ? 'Saved' : 'Save'}</span>
-          </button>
-        )}
-
         {/* Re-enhance Action */}
         <button
           onClick={isReenhancing ? undefined : onReenhance}
@@ -551,48 +473,6 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
             </>
           )}
         </button>
-
-        {/* Cancel Re-enhance button */}
-        {isReenhancing && onCancelReenhance && (
-          <button
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              onCancelReenhance();
-            }}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-            }}
-            title="Cancel re-enhancement"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 3,
-              padding: '3px 7px',
-              height: 24,
-              borderRadius: 12,
-              background: 'rgba(239, 68, 68, 0.08)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
-              color: '#EF4444',
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: 'pointer',
-              transition: 'all 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#EF4444';
-              e.currentTarget.style.color = '#FFFFFF';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)';
-              e.currentTarget.style.color = '#EF4444';
-            }}
-          >
-            <RoleIcon name="X" size={11} strokeWidth={2.5} />
-            <span>Cancel</span>
-          </button>
-        )}
 
         {/* Dismiss Button */}
         {!isReenhancing && (

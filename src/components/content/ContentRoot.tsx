@@ -159,16 +159,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   }, [flowState, reset]);
 
   const isEnhancingRef = useRef(false);
-  const isCancelledRef = useRef(false);
-
-  const handleCancelEnhance = useCallback(() => {
-    isCancelledRef.current = true;
-    isEnhancingRef.current = false;
-    setFlowState('idle');
-    useEnhanceStore.getState().setError(null);
-    sendMessage('CANCEL_ENHANCE', { promptId: enhanceResult?.promptId }).catch(() => {});
-    console.log('[AURE] Prompt enhancement cancelled by user — aborted backend API');
-  }, [setFlowState, enhanceResult]);
 
   const triggerEnhance = useCallback(
     async (mode: EnhancementMode, role?: string, roleMode?: string) => {
@@ -180,13 +170,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
       // Priority 1: Check login status before validating prompt or calling backend
       await useAuthStore.getState().loadAuth();
-      if (isCancelledRef.current) return;
 
       const { isAuthenticated, user } = useAuthStore.getState();
       const cachedProfile = await getStorage('userProfile');
 
       if (!isAuthenticated && !user && !cachedProfile) {
-        if (isCancelledRef.current) return;
         useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
         setFlowState('error');
         // Open workspace sidepanel automatically for quick login
@@ -214,7 +202,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
       // Mark as enhancing immediately (synchronous lock before any await)
       isEnhancingRef.current = true;
-      isCancelledRef.current = false;
       setFlowState('enhancing');
       useEnhanceStore.getState().setError(null);
       setCurrentPrompt(prompt);
@@ -238,12 +225,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           }),
         ]);
 
-        // If user pressed Cancel while waiting for network, discard results completely
-        if (isCancelledRef.current) {
-          console.log('[AURE] Enhancement completed after user cancelled. Discarding output.');
-          return;
-        }
-
         if (result.status === 'fulfilled') {
           setEnhanceResult(result.value);
           // Directly replace text inside input box with formatted clean prompt
@@ -260,7 +241,12 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
             { versionNumber: 1, text: result.value.enhancedPrompt, label: 'v1-enhanced' },
           ]);
           setActiveVersionNumber(1);
-          setIsPromptSaved(false);
+
+          // Automatically broadcast history update on successful enhancement
+          try {
+            chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: result.value.promptId } }).catch(() => {});
+            chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+          } catch {}
         } else {
           throw new Error(result.reason?.message ?? 'Enhancement failed');
         }
@@ -269,7 +255,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           setRecommendation(recommendation.value);
         }
       } catch (error) {
-        if (isCancelledRef.current) return;
         const message = error instanceof Error ? error.message : 'Enhancement failed';
         useEnhanceStore.getState().setError(message);
         setFlowState('error');
@@ -327,39 +312,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
   const [versionHistory, setVersionHistory] = useState<PromptVersionItem[]>([]);
   const [activeVersionNumber, setActiveVersionNumber] = useState<number>(1);
-  const [isPromptSaved, setIsPromptSaved] = useState<boolean>(false);
   const [isReenhancing, setIsReenhancing] = useState(false);
   const isReenhancingRef = useRef(false);
-  const isReenhanceCancelledRef = useRef(false);
-
-  const handleSavePrompt = useCallback(async () => {
-    if (!enhanceResult || isPromptSaved) return;
-    try {
-      const activeText = adapterRef.current.extractPrompt() || enhanceResult.enhancedPrompt;
-      const res = await sendMessage('SAVE_ENHANCED_PROMPT', {
-        original_prompt: enhanceResult.originalPrompt || currentPrompt,
-        enhanced_prompt: activeText,
-        old_analysis: enhanceResult.originalAnalysis,
-        new_analysis: enhanceResult.enhancedAnalysis,
-        tool_recommendations: { tools: enhanceResult.toolRecommendations },
-        role: useEnhanceStore.getState().selectedRole || 'General',
-        mode: useEnhanceStore.getState().selectedMode || enhanceResult.mode || 'general',
-      });
-      if (res.success) {
-        setIsPromptSaved(true);
-      }
-    } catch (err) {
-      console.error('[AURE] Failed to save prompt to vault:', err);
-    }
-  }, [enhanceResult, isPromptSaved, currentPrompt]);
-
-  const handleCancelReenhance = useCallback(() => {
-    isReenhanceCancelledRef.current = true;
-    isReenhancingRef.current = false;
-    setIsReenhancing(false);
-    sendMessage('CANCEL_ENHANCE', { promptId: enhanceResult?.promptId }).catch(() => {});
-    console.log('[AURE] Re-enhancement cancelled by user — aborted backend API');
-  }, [enhanceResult]);
 
   const handleSelectVersion = useCallback(
     async (verNum: number) => {
@@ -378,7 +332,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const handleReenhance = useCallback(async () => {
     if (isReenhancingRef.current) return;
     isReenhancingRef.current = true;
-    isReenhanceCancelledRef.current = false;
     setIsReenhancing(true);
 
     try {
@@ -393,18 +346,18 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         platform: adapter.getPlatformName(),
       });
 
-      if (isReenhanceCancelledRef.current) {
-        console.log('[AURE] Re-enhancement completed after user cancelled. Discarding output.');
-        return;
-      }
-
       if (result && result.enhancedPrompt) {
         setEnhanceResult(result);
         const cleanText = formatPromptText(result.enhancedPrompt);
         await adapterRef.current.injectPrompt(cleanText);
         setIsUndone(false);
         setFlowState('injected');
-        setIsPromptSaved(false);
+
+        // Automatically broadcast history update on successful re-enhancement
+        try {
+          chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: result.promptId || promptId } }).catch(() => {});
+          chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+        } catch {}
 
         setVersionHistory((prev) => {
           const nextNum = prev.length;
@@ -420,7 +373,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         });
       }
     } catch (err) {
-      if (isReenhanceCancelledRef.current) return;
       console.error('[AURE] Failed to re-enhance prompt:', err);
     } finally {
       isReenhancingRef.current = false;
@@ -468,7 +420,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           adapter={adapter}
           onEnhance={handleEnhanceClick}
           onOpenHistory={handleOpenHistory}
-          onCancel={handleCancelEnhance}
         />
       )}
 
@@ -485,13 +436,10 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           onUndo={handleUndo}
           onReapply={handleReapply}
           onReenhance={handleReenhance}
-          onCancelReenhance={handleCancelReenhance}
           isReenhancing={isReenhancing}
           versions={versionHistory}
           currentVersionNumber={activeVersionNumber}
           onSelectVersion={handleSelectVersion}
-          onSave={handleSavePrompt}
-          isSaved={isPromptSaved}
           onDismiss={() => {
             setVersionHistory([]);
             reset();

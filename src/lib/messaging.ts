@@ -22,25 +22,47 @@ export async function sendMessage<T extends MessageType>(
   const requestId = generateRequestId();
   const message: Message<T> = { type, payload, requestId };
 
-  try {
-    const response = await chrome.runtime.sendMessage(message) as MessageResponse<T>;
+  const MAX_RETRIES = 2;
+  let lastError: Error | undefined;
 
-    if (!response) {
-      throw new Error(`No response received for message type: ${type}`);
-    }
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      const response = await chrome.runtime.sendMessage(message) as MessageResponse<T>;
 
-    if (!response.success) {
-      throw new Error(response.error ?? `Message failed: ${type}`);
-    }
+      if (!response) {
+        throw new Error(`No response received for message type: ${type}`);
+      }
 
-    return response.data as MessageMap[T]['response'];
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('Extension context invalidated')) {
-      // Extension was reloaded — fail gracefully
-      console.warn('[AURE] Extension context invalidated, reload the page.');
+      if (!response.success) {
+        throw new Error(response.error ?? `Message failed: ${type}`);
+      }
+
+      return response.data as MessageMap[T]['response'];
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      if (lastError.message.includes('Extension context invalidated')) {
+        console.warn('[AURE] Extension context invalidated, reload the page.');
+        throw lastError;
+      }
+
+      // Chrome MV3: service worker was terminated before responding — retry
+      const isPortClosed =
+        lastError.message.includes('message port closed') ||
+        lastError.message.includes('Could not establish connection') ||
+        lastError.message.includes('Receiving end does not exist');
+
+      if (isPortClosed && attempt < MAX_RETRIES) {
+        console.warn(`[AURE] Service worker port closed for ${type}, retrying (${attempt + 1}/${MAX_RETRIES})...`);
+        await new Promise((r) => setTimeout(r, 500));
+        continue;
+      }
+
+      throw lastError;
     }
-    throw error;
   }
+
+  throw lastError ?? new Error(`Message failed after retries: ${type}`);
 }
 
 /**

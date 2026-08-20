@@ -13,6 +13,28 @@ import { recommendModel } from '@/api/recommend';
 export default defineBackground(() => {
   console.log('[AURE] Service Worker started');
 
+  // ── Keep-Alive: prevent Chrome MV3 from terminating the service worker ───
+  // Chrome MV3 service workers idle after ~30s; we ping every 20s during active requests.
+  let keepAliveInterval: ReturnType<typeof setInterval> | null = null;
+  let activeRequestCount = 0;
+
+  function startKeepAlive() {
+    activeRequestCount++;
+    if (keepAliveInterval) return;
+    keepAliveInterval = setInterval(() => {
+      // Accessing chrome.runtime keeps the service worker awake
+      chrome.runtime.getPlatformInfo(() => {});
+    }, 20_000);
+  }
+
+  function stopKeepAlive() {
+    activeRequestCount = Math.max(0, activeRequestCount - 1);
+    if (activeRequestCount === 0 && keepAliveInterval) {
+      clearInterval(keepAliveInterval);
+      keepAliveInterval = null;
+    }
+  }
+
   // Initialize storage migration
   migrateStorageIfNeeded().catch(console.error);
 
@@ -33,8 +55,10 @@ export default defineBackground(() => {
     activeEnhanceController = new AbortController();
     const currentController = activeEnhanceController;
 
+    startKeepAlive();
+    let result: any = null;
     try {
-      const result = await enhancePromptStream(
+      result = await enhancePromptStream(
         {
           prompt: payload.prompt,
           mode: payload.mode,
@@ -52,18 +76,27 @@ export default defineBackground(() => {
         currentController.signal
       );
 
+      // If the user cancelled during the fetch, delete the saved record and abort
       if (currentController.signal.aborted) {
+        if (result?.promptId) {
+          deletePrompt(result.promptId).catch(() => {});
+        }
         throw new Error('Enhancement cancelled');
       }
 
       return result;
     } catch (err: any) {
       if (currentController.signal.aborted || err?.code === 'CANCELLED' || err?.name === 'AbortError') {
-        console.log('[AURE Background] Enhancement request cleanly aborted.');
+        // Delete any partial backend record created before the abort was received
+        if (result?.promptId) {
+          deletePrompt(result.promptId).catch(() => {});
+        }
+        console.log('[AURE Background] Enhancement cancelled — backend record cleaned up.');
         throw new Error('Enhancement cancelled');
       }
       throw err;
     } finally {
+      stopKeepAlive();
       if (activeEnhanceController === currentController) {
         activeEnhanceController = null;
       }
