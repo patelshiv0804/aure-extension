@@ -188,11 +188,18 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
     e.preventDefault();
     e.stopPropagation();
     if (flowState === 'enhancing') return;
-    if (isAuthError) {
+    if (!isAuthenticated) {
+      useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
+      setFlowState('error');
       handleHistoryClick(e);
-    } else {
-      onEnhance();
+      setTimeout(() => {
+        if (useEnhanceStore.getState().flowState === 'error') {
+          useEnhanceStore.getState().reset();
+        }
+      }, 4000);
+      return;
     }
+    onEnhance();
   };
 
   const handleModeClick = (e: React.MouseEvent) => {
@@ -224,6 +231,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       case 'error':
         const errStr = (error || '').toLowerCase();
         const isAuthErr =
+          !isAuthenticated ||
           errStr.includes('sign in') ||
           errStr.includes('logged in') ||
           errStr.includes('401') ||

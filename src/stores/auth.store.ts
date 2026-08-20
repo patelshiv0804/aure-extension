@@ -1,11 +1,11 @@
 // ──────────────────────────────────────────────────────────────
-// Auth Store — Zustand + HTTP Cookie & chrome.storage.local
+// Auth Store — Zustand + JWT Bearer & chrome.storage.local
 // ──────────────────────────────────────────────────────────────
 
 import { create } from 'zustand';
 import { apiRequest, ApiError } from '@/api/client';
-import { getAuthCookie, setAuthCookie, removeAuthCookie } from '@/lib/cookies';
 import { getStorage, setStorage, removeStorage, UserProfile } from '@/lib/storage';
+import { getAuthCookie, setAuthCookie, removeAuthCookie } from '@/lib/cookies';
 import { historyCache, enhanceCache } from '@/lib/cache';
 
 interface AuthState {
@@ -38,47 +38,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadAuth: async () => {
     set({ loading: true });
     try {
-      // 1. Try to read token from HTTP Cookie or chrome.storage.local
+      const storedToken = (await getStorage('promptiq_token')) || (await getStorage('apiToken'));
       const cookieToken = await getAuthCookie();
-      const storageToken = (await getStorage('promptiq_token')) || (await getStorage('apiToken'));
-      const token = cookieToken || storageToken || null;
+      const token = (storedToken && storedToken.trim()) || (cookieToken && cookieToken.trim()) || null;
       const cachedProfile = await getStorage('userProfile');
 
-      // If no token or cached profile is present, user is not signed in
-      if (!token && !cachedProfile) {
-        set({ user: null, token: null, isAuthenticated: false });
-        return;
+      // Pre-set cached identity for instant UI render while backend session is validated
+      if (token && cachedProfile) {
+        set({ token, user: cachedProfile, isAuthenticated: true });
+      } else if (cachedProfile) {
+        set({ token: null, user: cachedProfile, isAuthenticated: true });
+      } else {
+        set({ token: null, user: null, isAuthenticated: false });
       }
 
-      // Pre-set authenticated status from cached profile/token immediately for instant UI render
-      set({ token, user: cachedProfile || null, isAuthenticated: !!cachedProfile });
-
-      // 2. Validate cookie session with backend GET /profile/me
-      try {
-        const profile = await apiRequest<UserProfile>({
-          method: 'GET',
-          path: '/profile/me',
-        });
-        const activeCookie = (await getAuthCookie()) || token;
-        set({ user: profile, token: activeCookie, isAuthenticated: true });
-        await setStorage('userProfile', profile);
-        if (profile.email) await setStorage('currentUserEmail', profile.email);
-        if (activeCookie) {
-          await setStorage('promptiq_token', activeCookie);
-          await setStorage('apiToken', activeCookie);
-        }
-      } catch (err) {
-        // ONLY wipe session if API explicitly returns 401 Unauthorized
-        if (err instanceof ApiError && err.status === 401) {
-          await removeAuthCookie();
-          await removeStorage('userProfile');
-          await removeStorage('currentUserEmail');
-          await removeStorage('promptiq_token');
-          await removeStorage('apiToken');
-          set({ user: null, token: null, isAuthenticated: false });
-        } else if (cachedProfile) {
-          // Retain authenticated status with cached profile if network error or content script cross-origin fetch restriction
-          set({ user: cachedProfile, token: token || null, isAuthenticated: true });
+      // If we have a token or cookie, validate with GET /profile/me
+      if (token) {
+        try {
+          const profile = await apiRequest<UserProfile>({
+            method: 'GET',
+            path: '/profile/me',
+          });
+          set({ user: profile, token, isAuthenticated: true, error: null });
+          await setStorage('userProfile', profile);
+          if (profile.email) await setStorage('currentUserEmail', profile.email);
+        } catch (err) {
+          if (err instanceof ApiError && err.status === 401) {
+            await removeStorage('userProfile');
+            await removeStorage('currentUserEmail');
+            await removeStorage('promptiq_token');
+            await removeStorage('apiToken');
+            await removeAuthCookie();
+            set({ user: null, token: null, isAuthenticated: false });
+          } else if (cachedProfile) {
+            // Retain authenticated status with cached profile if network error or temporary disruption
+            set({ user: cachedProfile, token, isAuthenticated: true });
+          }
         }
       }
     } catch (err) {
@@ -97,27 +92,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ loading: true, error: null });
     try {
       const formData = new URLSearchParams();
-      formData.append('username', email);
+      formData.append('username', email.trim());
       formData.append('password', password);
 
-      const response = await apiRequest<{ access_token?: string }>({
+      const response = await apiRequest<{ access_token?: string; token_type?: string; user_id?: string }>({
         method: 'POST',
         path: '/auth/login',
         body: formData,
       });
 
-      // Retrieve HTTP cookie set automatically by backend response
-      const cookieToken = await getAuthCookie();
-      const accessToken = response.access_token || cookieToken || '';
-
-      if (accessToken) {
-        await setAuthCookie(accessToken);
-        await setStorage('promptiq_token', accessToken);
-        await setStorage('apiToken', accessToken);
-        set({ token: accessToken });
+      if (!response?.access_token) {
+        throw new Error('Invalid response from authentication server');
       }
 
-      // Fetch user profile using HTTP cookie credentials
+      const accessToken = response.access_token;
+      await setStorage('promptiq_token', accessToken);
+      await setStorage('apiToken', accessToken);
+      await setAuthCookie(accessToken);
+      set({ token: accessToken });
+
+      // Fetch user profile using bearer token
       const profile = await apiRequest<UserProfile>({
         method: 'GET',
         path: '/profile/me',
@@ -125,7 +119,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       await setStorage('userProfile', profile);
       if (profile.email) await setStorage('currentUserEmail', profile.email);
-      set({ user: profile, isAuthenticated: true, error: null });
+      set({ user: profile, token: accessToken, isAuthenticated: true, error: null });
 
       // Clear cached history/enhancements so user sees fresh data
       historyCache.clear();
@@ -146,14 +140,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         method: 'POST',
         path: '/auth/register',
         body: {
-          email,
+          email: email.trim(),
           password,
-          display_name: fullName || null,
+          display_name: fullName.trim() || null,
         },
       });
 
-      // Auto login after registration to set HTTP cookie session
-      await get().login(email, password);
+      // Auto login after registration
+      await get().login(email.trim(), password);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Registration failed';
       set({ error: message });
@@ -166,21 +160,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithGoogle: async (idToken: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await apiRequest<{ access_token?: string }>({
+      const response = await apiRequest<{ access_token?: string; token_type?: string; user_id?: string }>({
         method: 'POST',
         path: '/auth/google',
         body: { id_token: idToken },
       });
 
-      const cookieToken = await getAuthCookie();
-      const accessToken = response.access_token || cookieToken || '';
-
-      if (accessToken) {
-        await setAuthCookie(accessToken);
-        await setStorage('promptiq_token', accessToken);
-        await setStorage('apiToken', accessToken);
-        set({ token: accessToken });
+      if (!response?.access_token) {
+        throw new Error('Invalid response from Google authentication');
       }
+
+      const accessToken = response.access_token;
+      await setStorage('promptiq_token', accessToken);
+      await setStorage('apiToken', accessToken);
+      await setAuthCookie(accessToken);
+      set({ token: accessToken });
 
       const profile = await apiRequest<UserProfile>({
         method: 'GET',
@@ -189,7 +183,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       await setStorage('userProfile', profile);
       if (profile.email) await setStorage('currentUserEmail', profile.email);
-      set({ user: profile, isAuthenticated: true, error: null });
+      set({ user: profile, token: accessToken, isAuthenticated: true, error: null });
 
       historyCache.clear();
       enhanceCache.clear();
@@ -206,7 +200,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await apiRequest({
       method: 'POST',
       path: '/auth/forgot-password',
-      body: { email },
+      body: { email: email.trim() },
     });
   },
 
@@ -214,7 +208,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const response = await apiRequest<{ reset_token: string }>({
       method: 'POST',
       path: '/auth/verify-reset-otp',
-      body: { email, otp },
+      body: { email: email.trim(), otp: otp.trim() },
     });
     return response.reset_token;
   },
@@ -238,13 +232,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         path: '/auth/logout',
       });
     } catch (err) {
-      console.warn('[AURE] Logout API failed:', err);
+      // Backend auth is stateless JWT, ignore if /auth/logout endpoint returns 404/405
     } finally {
-      await removeAuthCookie();
       await removeStorage('userProfile');
       await removeStorage('currentUserEmail');
       await removeStorage('promptiq_token');
       await removeStorage('apiToken');
+      await removeAuthCookie();
       historyCache.clear();
       enhanceCache.clear();
       set({ user: null, token: null, isAuthenticated: false, loading: false, error: null });
@@ -258,9 +252,9 @@ if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
     if (areaName === 'local') {
       if (
         changes['userProfile'] ||
+        changes['currentUserEmail'] ||
         changes['promptiq_token'] ||
-        changes['apiToken'] ||
-        changes['currentUserEmail']
+        changes['apiToken']
       ) {
         useAuthStore.getState().loadAuth();
       }

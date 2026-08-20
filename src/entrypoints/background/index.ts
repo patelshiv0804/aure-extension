@@ -195,38 +195,51 @@ export default defineBackground(() => {
     return { success: true };
   });
 
-  onMessage('FILL_PROMPT', async (payload) => {
-    // 1. Query all open tabs across windows
-    const allTabs = await chrome.tabs.query({});
+  const SUPPORTED_AI_HOSTS = [
+    'chatgpt.com',
+    'chat.openai.com',
+    'claude.ai',
+    'gemini.google.com',
+    'perplexity.ai',
+    'grok.com',
+    'deepseek.com',
+    'copilot.microsoft.com',
+  ];
 
-    // 2. Find active HTTP/HTTPS webpage tab (excluding chrome-extension://)
-    let targetTab = allTabs.find(
-      (t) => t.active && t.url && (t.url.startsWith('http://') || t.url.startsWith('https://'))
-    );
-
-    // 3. If not found, find any open tab on ChatGPT, Claude, Gemini, etc.
-    if (!targetTab) {
-      targetTab = allTabs.find(
-        (t) =>
-          t.url &&
-          (t.url.includes('chatgpt.com') ||
-            t.url.includes('chat.openai.com') ||
-            t.url.includes('claude.ai') ||
-            t.url.includes('gemini.google.com') ||
-            t.url.includes('perplexity.ai') ||
-            t.url.includes('grok.com') ||
-            t.url.includes('deepseek.com'))
+  function isSupportedAiTab(url?: string): boolean {
+    if (!url) return false;
+    try {
+      const parsed = new URL(url);
+      return SUPPORTED_AI_HOSTS.some(
+        (host) => parsed.hostname === host || parsed.hostname.endsWith('.' + host)
       );
+    } catch {
+      return false;
+    }
+  }
+
+  onMessage('FILL_PROMPT', async (payload, sender) => {
+    // Enforce internal extension authorization (AURE-03)
+    if (sender.id !== chrome.runtime.id) {
+      return { success: false, error: 'Unauthorized sender' };
     }
 
-    // 4. Final fallback: active tab
+    // 1. Query active tab in current window
+    const [currentActiveTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    let targetTab = currentActiveTab && isSupportedAiTab(currentActiveTab.url) ? currentActiveTab : null;
+
+    // 2. If active tab is not on a supported AI platform, find any open tab on supported AI platforms
     if (!targetTab) {
-      const activeTabs = await chrome.tabs.query({ active: true });
-      targetTab = activeTabs.find((t) => t.url && !t.url.startsWith('chrome-extension://')) ?? activeTabs[0];
+      const allTabs = await chrome.tabs.query({});
+      targetTab = allTabs.find((t) => isSupportedAiTab(t.url)) || null;
     }
 
+    // 3. Strict least-privilege enforcement (AURE-04): Refuse to inject prompt into arbitrary unrelated tabs
     if (!targetTab?.id) {
-      return { success: false, error: 'No active webpage tab found' };
+      return {
+        success: false,
+        error: 'No supported AI platform tab (ChatGPT, Claude, Gemini, DeepSeek, etc.) is currently open.',
+      };
     }
 
     try {

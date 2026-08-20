@@ -1,0 +1,665 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+2 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
+endobj
+4 0 obj
+<< /Type /Pages /Count 4 /Kids [6 0 R 8 0 R 10 0 R 12 0 R] >>
+endobj
+5 0 obj
+<< /Length 5242 >>
+stream
+BT
+/F1 11 Tf
+/F2 20 Tf
+1 0 0 1 54.00 738.00 Tm
+(AURE Security Audit Report) Tj
+/F2 12 Tf
+1 0 0 1 54.00 714.00 Tm
+(Browser Extension Security Assessment) Tj
+/F1 10 Tf
+1 0 0 1 54.00 698.00 Tm
+(Assessment date: August 17, 2026) Tj
+/F1 10 Tf
+1 0 0 1 54.00 684.00 Tm
+(Target: AURE_extension source repository) Tj
+/F1 11 Tf
+1 0 0 1 54.00 652.00 Tm
+(Executive summary: The reviewed Manifest V3 extension did not show confirmed remote code) Tj
+/F1 11 Tf
+1 0 0 1 54.00 637.00 Tm
+(execution, direct DOM XSS, or a webpage-to-background postMessage bridge in the current) Tj
+/F1 11 Tf
+1 0 0 1 54.00 622.00 Tm
+(source. The strongest confirmed weaknesses are around authentication token storage,) Tj
+/F1 11 Tf
+1 0 0 1 54.00 607.00 Tm
+(trust of plaintext localhost services, and limited authorization checks around) Tj
+/F1 11 Tf
+1 0 0 1 54.00 592.00 Tm
+(privileged internal messaging.) Tj
+/F1 11 Tf
+1 0 0 1 54.00 573.00 Tm
+(Finding totals: 0 Critical, 0 High, 2 Medium, 2 Low, 0 Informational. Backend-side) Tj
+/F1 11 Tf
+1 0 0 1 54.00 558.00 Tm
+(issues such as IDOR, BOLA, JWT validation, password-reset abuse, and rate limiting could) Tj
+/F1 11 Tf
+1 0 0 1 54.00 543.00 Tm
+(not be fully verified because the backend source was not included in the provided) Tj
+/F1 11 Tf
+1 0 0 1 54.00 528.00 Tm
+(repository.) Tj
+/F2 14 Tf
+1 0 0 1 54.00 505.00 Tm
+(Architecture and attack surface) Tj
+/F2 11 Tf
+1 0 0 1 72.00 487.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 487.00 Tm
+(Manifest V3 extension with one service worker, one content script, popup UI, and side) Tj
+/F1 11 Tf
+1 0 0 1 84.00 472.00 Tm
+(panel UI.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 457.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 457.00 Tm
+(Permissions: storage, activeTab, sidePanel, tabs.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 442.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 442.00 Tm
+(Host permissions include ChatGPT, Claude, Gemini, Grok, Perplexity, DeepSeek, Copilot,) Tj
+/F1 11 Tf
+1 0 0 1 84.00 427.00 Tm
+(and localhost or 127.0.0.1 backend endpoints.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 412.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 412.00 Tm
+(Core trust boundaries: webpage DOM -> content script -> background worker -> localhost) Tj
+/F1 11 Tf
+1 0 0 1 84.00 397.00 Tm
+(API -> user account data.) Tj
+/F2 14 Tf
+1 0 0 1 54.00 376.00 Tm
+(Vulnerability summary) Tj
+/F2 9 Tf
+1 0 0 1 58.00 344.00 Tm
+(ID) Tj
+/F2 9 Tf
+1 0 0 1 120.00 344.00 Tm
+(Severity) Tj
+/F2 9 Tf
+1 0 0 1 184.00 344.00 Tm
+(Issue) Tj
+/F2 9 Tf
+1 0 0 1 404.00 344.00 Tm
+(Impact) Tj
+/F1 8 Tf
+1 0 0 1 58.00 325.00 Tm
+(AURE-01) Tj
+/F1 8 Tf
+1 0 0 1 120.00 325.00 Tm
+(Medium) Tj
+/F1 8 Tf
+1 0 0 1 184.00 325.00 Tm
+(Session tokens stored in extension-readable) Tj
+/F1 8 Tf
+1 0 0 1 184.00 316.00 Tm
+(storage) Tj
+/F1 8 Tf
+1 0 0 1 404.00 325.00 Tm
+(Account takeover if extension context is) Tj
+/F1 8 Tf
+1 0 0 1 404.00 316.00 Tm
+(compromised) Tj
+/F1 8 Tf
+1 0 0 1 58.00 307.00 Tm
+(AURE-02) Tj
+/F1 8 Tf
+1 0 0 1 120.00 307.00 Tm
+(Medium) Tj
+/F1 8 Tf
+1 0 0 1 184.00 307.00 Tm
+(Plain HTTP localhost auth and API trust) Tj
+/F1 8 Tf
+1 0 0 1 404.00 307.00 Tm
+(Credential capture, token theft, prompt and) Tj
+/F1 8 Tf
+1 0 0 1 404.00 298.00 Tm
+(history exposure) Tj
+/F1 8 Tf
+1 0 0 1 58.00 289.00 Tm
+(AURE-03) Tj
+/F1 8 Tf
+1 0 0 1 120.00 289.00 Tm
+(Low) Tj
+/F1 8 Tf
+1 0 0 1 184.00 289.00 Tm
+(Background handlers lack sender-level) Tj
+/F1 8 Tf
+1 0 0 1 184.00 280.00 Tm
+(authorization checks) Tj
+/F1 8 Tf
+1 0 0 1 404.00 289.00 Tm
+(Sensitive actions available to any compromised) Tj
+/F1 8 Tf
+1 0 0 1 404.00 280.00 Tm
+(internal extension page) Tj
+/F1 8 Tf
+1 0 0 1 58.00 271.00 Tm
+(AURE-04) Tj
+/F1 8 Tf
+1 0 0 1 120.00 271.00 Tm
+(Low) Tj
+/F1 8 Tf
+1 0 0 1 184.00 271.00 Tm
+(Broader tab access and generic prompt injection) Tj
+/F1 8 Tf
+1 0 0 1 184.00 262.00 Tm
+(targeting) Tj
+/F1 8 Tf
+1 0 0 1 404.00 271.00 Tm
+(Larger blast radius after compromise, weaker) Tj
+/F1 8 Tf
+1 0 0 1 404.00 262.00 Tm
+(least-privilege posture) Tj
+/F2 14 Tf
+1 0 0 1 54.00 254.00 Tm
+(Detailed findings) Tj
+/F2 12 Tf
+1 0 0 1 54.00 236.00 Tm
+(AURE-01 - Session tokens are persisted in extension-readable storage) Tj
+/F2 10 Tf
+1 0 0 1 54.00 218.00 Tm
+(Severity: Medium | CWE-922, CWE-312) Tj
+/F3 10 Tf
+1 0 0 1 54.00 204.00 Tm
+(Location: src/stores/auth.store.ts and src/lib/cookies.ts) Tj
+/F1 10 Tf
+1 0 0 1 54.00 190.00 Tm
+(What is the problem: The login and session-loading paths copy access tokens into) Tj
+/F1 10 Tf
+1 0 0 1 54.00 176.00 Tm
+(chrome.storage.local under promptiq_token and apiToken, then reuse them automatically in the API) Tj
+/F1 10 Tf
+1 0 0 1 54.00 162.00 Tm
+(client. The cookie helper also falls back to document.cookie when available. This means the) Tj
+/F1 10 Tf
+1 0 0 1 54.00 148.00 Tm
+(extension stores bearer credentials in places readable by extension JavaScript rather than) Tj
+/F1 10 Tf
+1 0 0 1 54.00 134.00 Tm
+(relying solely on server-managed HttpOnly cookies.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 120.00 Tm
+(Evidence: auth.store.ts lines 103-117, 169-182, and 243-247; cookies.ts lines 71-75 and 103-107;) Tj
+/F1 10 Tf
+1 0 0 1 54.00 106.00 Tm
+(api/client.ts lines 49-55 and 95-97.) Tj
+ET
+54 664 m 558 664 l S
+0.92 0.94 0.97 rg
+54 338 558 20 re f
+0 0 0 rg
+54 266 558 92 re S
+116 358 m 116 266 l S
+180 358 m 180 266 l S
+400 358 m 400 266 l S
+54 340 m 612 340 l S
+54 322 m 612 322 l S
+54 304 m 612 304 l S
+54 286 m 612 286 l S
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 5 0 R >>
+endobj
+7 0 obj
+<< /Length 5075 >>
+stream
+BT
+/F1 11 Tf
+/F1 10 Tf
+1 0 0 1 54.00 738.00 Tm
+(Impact: If any extension UI context is compromised in the future, the attacker can recover the) Tj
+/F1 10 Tf
+1 0 0 1 54.00 724.00 Tm
+(bearer token and impersonate the user against profile, save, history, and prompt endpoints. This) Tj
+/F1 10 Tf
+1 0 0 1 54.00 710.00 Tm
+(is a realistic account takeover and data exposure path after extension compromise.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 696.00 Tm
+(Recommended fix: Keep session state only in Secure, HttpOnly, SameSite cookies where possible.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 682.00 Tm
+(Stop copying access tokens into chrome.storage.local. Remove document.cookie fallback for auth) Tj
+/F1 10 Tf
+1 0 0 1 54.00 668.00 Tm
+(tokens, and either enforce the encryptData setting or remove it from the product.) Tj
+/F2 12 Tf
+1 0 0 1 54.00 648.00 Tm
+(AURE-02 - The extension trusts plaintext localhost services for auth and API) Tj
+/F2 12 Tf
+1 0 0 1 54.00 632.00 Tm
+(traffic) Tj
+/F2 10 Tf
+1 0 0 1 54.00 614.00 Tm
+(Severity: Medium | CWE-319, CWE-346) Tj
+/F3 10 Tf
+1 0 0 1 54.00 600.00 Tm
+(Location: src/api/client.ts, src/lib/cookies.ts, and src/components/auth/AuthView.tsx) Tj
+/F1 10 Tf
+1 0 0 1 54.00 586.00 Tm
+(What is the problem: The default API endpoint is http://127.0.0.1:8000/api/v1, the cookie origin) Tj
+/F1 10 Tf
+1 0 0 1 54.00 572.00 Tm
+(defaults to http://127.0.0.1:8000, and the Google sign-in button opens) Tj
+/F1 10 Tf
+1 0 0 1 54.00 558.00 Tm
+(http://localhost:3000/auth. The extension will also honor a custom advanced.apiEndpoint value) Tj
+/F1 10 Tf
+1 0 0 1 54.00 544.00 Tm
+(without enforcing HTTPS for non-loopback origins.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 530.00 Tm
+(Evidence: api/client.ts lines 40-43 and 127-133; cookies.ts line 7 and lines 88-97; AuthView.tsx) Tj
+/F1 10 Tf
+1 0 0 1 54.00 516.00 Tm
+(line 237.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 502.00 Tm
+(Impact: A malicious or unexpected local process can impersonate the backend, capture credentials) Tj
+/F1 10 Tf
+1 0 0 1 54.00 488.00 Tm
+(or tokens, and collect prompts or history over plaintext HTTP. If users point the extension at) Tj
+/F1 10 Tf
+1 0 0 1 54.00 474.00 Tm
+(another insecure endpoint, Authorization and X-Current-User headers will be sent there as well.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 460.00 Tm
+(Recommended fix: Require HTTPS for all non-loopback endpoints, explicitly allow only approved) Tj
+/F1 10 Tf
+1 0 0 1 54.00 446.00 Tm
+(origins, and avoid plain HTTP for authentication flows. Treat localhost as a development-only) Tj
+/F1 10 Tf
+1 0 0 1 54.00 432.00 Tm
+(mode with strong warnings and separate build-time controls.) Tj
+/F2 12 Tf
+1 0 0 1 54.00 412.00 Tm
+(AURE-03 - Privileged background handlers do not enforce sender-based) Tj
+/F2 12 Tf
+1 0 0 1 54.00 396.00 Tm
+(authorization) Tj
+/F2 10 Tf
+1 0 0 1 54.00 378.00 Tm
+(Severity: Low | CWE-285, CWE-639) Tj
+/F3 10 Tf
+1 0 0 1 54.00 364.00 Tm
+(Location: src/lib/messaging.ts and src/entrypoints/background/index.ts) Tj
+/F1 10 Tf
+1 0 0 1 54.00 350.00 Tm
+(What is the problem: The message router dispatches requests by message type without checking) Tj
+/F1 10 Tf
+1 0 0 1 54.00 336.00 Tm
+(sender.url, sender.id, or intended caller role. Sensitive handlers such as GET_HISTORY,) Tj
+/F1 10 Tf
+1 0 0 1 54.00 322.00 Tm
+(DELETE_PROMPT, UPDATE_SETTINGS, SAVE_VERSION, and FILL_PROMPT assume any caller inside the) Tj
+/F1 10 Tf
+1 0 0 1 54.00 308.00 Tm
+(extension is allowed to use them.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 294.00 Tm
+(Evidence: lib/messaging.ts lines 91-114; background/index.ts lines 153-180 and 198-241.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 280.00 Tm
+(Impact: I did not find a direct webpage-to-background bridge in the current source, so this is) Tj
+/F1 10 Tf
+1 0 0 1 54.00 266.00 Tm
+(not a confirmed remote exploit from the open web. However, if any extension page is compromised) Tj
+/F1 10 Tf
+1 0 0 1 54.00 252.00 Tm
+(later, sensitive background capabilities are immediately available without further authorization) Tj
+/F1 10 Tf
+1 0 0 1 54.00 238.00 Tm
+(checks.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 224.00 Tm
+(Recommended fix: Apply per-action authorization in the background worker. Validate sender) Tj
+/F1 10 Tf
+1 0 0 1 54.00 210.00 Tm
+(context and limit high-risk actions to the specific popup, side panel, or trusted content-script) Tj
+/F1 10 Tf
+1 0 0 1 54.00 196.00 Tm
+(origins that need them.) Tj
+/F2 12 Tf
+1 0 0 1 54.00 176.00 Tm
+(AURE-04 - Tabs permission and generic prompt-fill targeting are broader than) Tj
+/F2 12 Tf
+1 0 0 1 54.00 160.00 Tm
+(necessary) Tj
+/F2 10 Tf
+1 0 0 1 54.00 142.00 Tm
+(Severity: Low | CWE-250) Tj
+/F3 10 Tf
+1 0 0 1 54.00 128.00 Tm
+(Location: manifest.json and src/entrypoints/background/index.ts) Tj
+/F1 10 Tf
+1 0 0 1 54.00 114.00 Tm
+(What is the problem: The extension requests tabs in addition to activeTab and uses FILL_PROMPT) Tj
+/F1 10 Tf
+1 0 0 1 54.00 100.00 Tm
+(logic that enumerates all tabs and then chooses any active HTTP or HTTPS page before falling) Tj
+/F1 10 Tf
+1 0 0 1 54.00 86.00 Tm
+(back to known AI domains. This is broader than the core product need suggested by the supported) Tj
+/F1 10 Tf
+1 0 0 1 54.00 72.00 Tm
+(site list.) Tj
+ET
+endstream
+endobj
+8 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 7 0 R >>
+endobj
+9 0 obj
+<< /Length 5565 >>
+stream
+BT
+/F1 11 Tf
+/F1 10 Tf
+1 0 0 1 54.00 738.00 Tm
+(Evidence: manifest.json permissions block; background/index.ts lines 198-237.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 724.00 Tm
+(Impact: The broader permission and loose targeting increase the blast radius if the extension is) Tj
+/F1 10 Tf
+1 0 0 1 54.00 710.00 Tm
+(abused internally. It also weakens least-privilege posture by allowing prompt injection) Tj
+/F1 10 Tf
+1 0 0 1 54.00 696.00 Tm
+(targeting logic to consider unrelated browser tabs.) Tj
+/F1 10 Tf
+1 0 0 1 54.00 682.00 Tm
+(Recommended fix: Prefer activeTab with strict host checks and refuse fill actions outside the) Tj
+/F1 10 Tf
+1 0 0 1 54.00 668.00 Tm
+(supported AI platforms unless the user explicitly enables a controlled custom-site mode.) Tj
+/F2 14 Tf
+1 0 0 1 54.00 648.00 Tm
+(Attack path analysis) Tj
+/F2 11 Tf
+1 0 0 1 72.00 630.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 630.00 Tm
+(Local malicious process -> binds localhost backend endpoint -> receives credentials or) Tj
+/F1 11 Tf
+1 0 0 1 84.00 615.00 Tm
+(bearer token -> accesses user profile, prompts, and saved prompt history.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 600.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 600.00 Tm
+(Future compromise of popup or side panel code -> reads promptiq_token or apiToken from) Tj
+/F1 11 Tf
+1 0 0 1 84.00 585.00 Tm
+(chrome.storage.local -> reuses bearer token through API client -> unauthorized access to) Tj
+/F1 11 Tf
+1 0 0 1 84.00 570.00 Tm
+(user data.) Tj
+/F2 14 Tf
+1 0 0 1 54.00 549.00 Tm
+(Security test matrix) Tj
+/F2 9 Tf
+1 0 0 1 58.00 517.00 Tm
+(Category) Tj
+/F2 9 Tf
+1 0 0 1 180.00 517.00 Tm
+(Result) Tj
+/F2 9 Tf
+1 0 0 1 252.00 517.00 Tm
+(Notes) Tj
+/F1 8 Tf
+1 0 0 1 58.00 498.00 Tm
+(XSS and DOM injection) Tj
+/F1 8 Tf
+1 0 0 1 180.00 498.00 Tm
+(PASS) Tj
+/F1 8 Tf
+1 0 0 1 252.00 498.00 Tm
+(No confirmed exploit path from attacker-controlled input to) Tj
+/F1 8 Tf
+1 0 0 1 252.00 489.00 Tm
+(dangerous DOM sink in current source) Tj
+/F1 8 Tf
+1 0 0 1 58.00 480.00 Tm
+(Message passing) Tj
+/F1 8 Tf
+1 0 0 1 180.00 480.00 Tm
+(PARTIAL) Tj
+/F1 8 Tf
+1 0 0 1 252.00 480.00 Tm
+(No external webpage bridge found, but internal background handlers) Tj
+/F1 8 Tf
+1 0 0 1 252.00 471.00 Tm
+(lack sender-level checks) Tj
+/F1 8 Tf
+1 0 0 1 58.00 462.00 Tm
+(Token security) Tj
+/F1 8 Tf
+1 0 0 1 180.00 462.00 Tm
+(FAIL) Tj
+/F1 8 Tf
+1 0 0 1 252.00 462.00 Tm
+(Bearer tokens persisted in local storage and reused automatically) Tj
+/F1 8 Tf
+1 0 0 1 58.00 444.00 Tm
+(Transport security) Tj
+/F1 8 Tf
+1 0 0 1 180.00 444.00 Tm
+(FAIL) Tj
+/F1 8 Tf
+1 0 0 1 252.00 444.00 Tm
+(Plain HTTP localhost defaults used for auth and API) Tj
+/F1 8 Tf
+1 0 0 1 58.00 426.00 Tm
+(Extension permissions) Tj
+/F1 8 Tf
+1 0 0 1 180.00 426.00 Tm
+(PARTIAL) Tj
+/F1 8 Tf
+1 0 0 1 252.00 426.00 Tm
+(No dangerous web-accessible scripts, but tabs scope is broader than) Tj
+/F1 8 Tf
+1 0 0 1 252.00 417.00 Tm
+(needed) Tj
+/F1 8 Tf
+1 0 0 1 58.00 408.00 Tm
+(Secrets scan) Tj
+/F1 8 Tf
+1 0 0 1 180.00 408.00 Tm
+(PASS) Tj
+/F1 8 Tf
+1 0 0 1 252.00 408.00 Tm
+(No hardcoded secrets found in repository review) Tj
+/F1 8 Tf
+1 0 0 1 58.00 390.00 Tm
+(Dependency audit) Tj
+/F1 8 Tf
+1 0 0 1 180.00 390.00 Tm
+(PARTIAL) Tj
+/F1 8 Tf
+1 0 0 1 252.00 390.00 Tm
+(npm audit could not be completed because the audit endpoint was) Tj
+/F1 8 Tf
+1 0 0 1 252.00 381.00 Tm
+(unreachable in this environment on August 17, 2026) Tj
+/F1 8 Tf
+1 0 0 1 58.00 372.00 Tm
+(Backend authorization) Tj
+/F1 8 Tf
+1 0 0 1 180.00 372.00 Tm
+(NOT VERIFIED) Tj
+/F1 8 Tf
+1 0 0 1 252.00 372.00 Tm
+(Backend source not included, so IDOR or BOLA could not be confirmed) Tj
+/F1 8 Tf
+1 0 0 1 252.00 363.00 Tm
+(from extension code alone) Tj
+/F2 14 Tf
+1 0 0 1 54.00 355.00 Tm
+(Positive security controls) Tj
+/F2 11 Tf
+1 0 0 1 72.00 337.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 337.00 Tm
+(No externally_connectable configuration was present in the manifest.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 322.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 322.00 Tm
+(No unsafe eval, Function constructor use, or direct webpage postMessage bridge was) Tj
+/F1 11 Tf
+1 0 0 1 84.00 307.00 Tm
+(identified in the current source.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 292.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 292.00 Tm
+(Content-script scope is limited to the declared AI platform domains rather than all) Tj
+/F1 11 Tf
+1 0 0 1 84.00 277.00 Tm
+(sites.) Tj
+/F2 14 Tf
+1 0 0 1 54.00 256.00 Tm
+(Remediation roadmap) Tj
+/F2 11 Tf
+1 0 0 1 72.00 238.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 238.00 Tm
+(P0: Remove token duplication into chrome.storage.local and avoid document.cookie auth) Tj
+/F1 11 Tf
+1 0 0 1 84.00 223.00 Tm
+(fallback.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 208.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 208.00 Tm
+(P0: Enforce secure transport rules and block insecure custom API endpoints by default.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 193.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 193.00 Tm
+(P1: Add sender-aware authorization checks for privileged background actions.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 178.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 178.00 Tm
+(P1: Reduce permissions and tighten prompt-fill tab targeting logic.) Tj
+/F2 11 Tf
+1 0 0 1 72.00 163.00 Tm
+(-) Tj
+/F1 11 Tf
+1 0 0 1 84.00 163.00 Tm
+(P2: Add explicit threat-model tests for extension trust boundaries and) Tj
+/F1 11 Tf
+1 0 0 1 84.00 148.00 Tm
+(malicious-local-service scenarios.) Tj
+/F2 14 Tf
+1 0 0 1 54.00 127.00 Tm
+(Verification limits) Tj
+ET
+0.92 0.94 0.97 rg
+54 511 504 20 re f
+0 0 0 rg
+54 367 504 164 re S
+176 531 m 176 367 l S
+248 531 m 248 367 l S
+54 513 m 558 513 l S
+54 495 m 558 495 l S
+54 477 m 558 477 l S
+54 459 m 558 459 l S
+54 441 m 558 441 l S
+54 423 m 558 423 l S
+54 405 m 558 405 l S
+54 387 m 558 387 l S
+endstream
+endobj
+10 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 9 0 R >>
+endobj
+11 0 obj
+<< /Length 690 >>
+stream
+BT
+/F1 11 Tf
+/F1 10 Tf
+1 0 0 1 54.00 738.00 Tm
+(This report is evidence-driven from the provided extension source code only. The backend) Tj
+/F1 10 Tf
+1 0 0 1 54.00 724.00 Tm
+(implementation was not present, so server-side authentication, authorization, rate limiting, JWT) Tj
+/F1 10 Tf
+1 0 0 1 54.00 710.00 Tm
+(handling, and cross-user data access could not be verified from source. The local environment) Tj
+/F1 10 Tf
+1 0 0 1 54.00 696.00 Tm
+(also did not provide the usual PDF rendering toolchain, so final PDF QA was limited to) Tj
+/F1 10 Tf
+1 0 0 1 54.00 682.00 Tm
+(structural checks rather than image-based page rendering.) Tj
+/F2 10 Tf
+1 0 0 1 54.00 664.00 Tm
+(End of report.) Tj
+ET
+endstream
+endobj
+12 0 obj
+<< /Type /Page /Parent 4 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 1 0 R /F2 2 0 R /F3 3 0 R >> >> /Contents 11 0 R >>
+endobj
+13 0 obj
+<< /Type /Catalog /Pages 4 0 R >>
+endobj
+xref
+0 14
+0000000000 65535 f 
+0000000009 00000 n 
+0000000079 00000 n 
+0000000154 00000 n 
+0000000222 00000 n 
+0000000299 00000 n 
+0000005592 00000 n 
+0000005738 00000 n 
+0000010864 00000 n 
+0000011010 00000 n 
+0000016626 00000 n 
+0000016773 00000 n 
+0000017514 00000 n 
+0000017662 00000 n 
+trailer
+<< /Size 14 /Root 13 0 R >>
+startxref
+17712
+%%EOF

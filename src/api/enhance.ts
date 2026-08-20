@@ -10,109 +10,38 @@ export interface EnhanceProgressCallback {
 }
 
 /**
- * Call the streaming enhancement API (POST /enhance/stream) with real-time SSE progress.
- * Does NOT persist to database automatically.
+ * Call the enhancement API (POST /enhance) with real-time UI progress stages.
  */
 export async function enhancePromptStream(
   request: EnhanceApiRequest,
   onProgress: EnhanceProgressCallback,
   signal?: AbortSignal
 ): Promise<EnhanceResult> {
-  let finalResult: EnhanceResult | null = null;
-  let streamError: Error | null = null;
+  // Smooth simulated progress stages for UI responsiveness while backend processes
+  onProgress(15, 'INIT', 'Analyzing Requirements...');
+  const timer1 = setTimeout(() => {
+    if (!signal?.aborted) onProgress(40, 'TEMPLATE', 'Matching Template...');
+  }, 400);
+  const timer2 = setTimeout(() => {
+    if (!signal?.aborted) onProgress(70, 'OPTIMIZING', 'Optimizing Prompt...');
+  }, 1200);
+  const timer3 = setTimeout(() => {
+    if (!signal?.aborted) onProgress(88, 'SCORING', 'Evaluating Quality...');
+  }, 2200);
 
-  await apiStreamRequest(
-    {
-      method: 'POST',
-      path: '/enhance/stream',
-      body: {
-        prompt: request.prompt,
-        role: request.role ?? request.mode,
-        mode: request.mode,
-        variables: request.variables,
-        apply_style: request.apply_style,
-        style_profile_id: request.style_profile_id,
-        auto_save: false,
-      },
-      rateLimitKey: 'enhance',
-      timeout: 90_000,
-      signal,
-    },
-    ({ event, data }) => {
-      if (event === 'progress' && data) {
-        onProgress(data.progress ?? 0, data.stage ?? 'PROCESSING', data.message ?? 'Processing...');
-      } else if (event === 'complete' && data) {
-        const backendData = data.data ?? data;
-        const formattedOriginal = formatPromptText(backendData.original_prompt || request.prompt);
-        const formattedEnhanced = formatPromptText(backendData.enhanced_prompt || '');
-        const originalWords = formattedOriginal.split(/\s+/).filter(Boolean).length;
-        const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
-        const origAnalysis = (backendData.original_analysis ?? backendData.analysis) as any;
-        const enhAnalysis = backendData.enhanced_analysis as any;
-
-        const beforeScore = normalizeScore(
-          origAnalysis?.overall_score ?? backendData.comparison?.before_score ?? backendData.analysis?.overall_score ?? 0
-        );
-        const afterScore = normalizeScore(
-          enhAnalysis?.overall_score ?? backendData.comparison?.after_score ?? beforeScore
-        );
-        const improvementScore = Math.max(0, afterScore - beforeScore);
-
-        const rawTools = backendData.tool_recommendations?.tools ?? [];
-        const toolRecs = rawTools.map((t: any) => {
-          const name = t.name ?? 'AI Tool';
-          const info = MODEL_MAP[name.toLowerCase()] ?? AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
-          return {
-            name,
-            rank: t.rank ?? 1,
-            url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
-          };
-        });
-
-        finalResult = {
-          promptId: backendData.version?.prompt_id ?? undefined,
-          originalPrompt: formattedOriginal,
-          enhancedPrompt: formattedEnhanced,
-          mode: request.mode,
-          metrics: {
-            clarity: afterScore,
-            specificity: Math.min(100, afterScore + Math.round(improvementScore / 2)),
-            context: Math.min(100, afterScore + Math.round(improvementScore / 3)),
-            successProbability: afterScore,
-            wordCountOriginal: originalWords,
-            wordCountEnhanced: enhancedWords,
-            tokenCountOriginal: Math.ceil(originalWords * 1.3),
-            tokenCountEnhanced: Math.ceil(enhancedWords * 1.3),
-            readabilityOriginal: beforeScore,
-            readabilityEnhanced: afterScore,
-          },
-          category: detectCategory(formattedOriginal),
-          suggestions: backendData.comparison?.improvements ?? [],
-          timestamp: Date.now(),
-          originalAnalysis: origAnalysis,
-          enhancedAnalysis: enhAnalysis,
-          toolRecommendations: toolRecs,
-        };
-        onProgress(100, 'COMPLETE', 'Prompt enhanced successfully');
-      } else if (event === 'error' && data) {
-        streamError = new Error(data.error ?? 'Enhancement stream failed');
-      }
-    }
-  );
-
-  if (signal?.aborted) {
-    throw new Error('Enhancement cancelled by user');
+  try {
+    const result = await enhancePrompt(request, signal);
+    clearTimeout(timer1);
+    clearTimeout(timer2);
+    clearTimeout(timer3);
+    onProgress(100, 'COMPLETE', 'Prompt enhanced successfully');
+    return result;
+  } catch (err) {
+    clearTimeout(timer1);
+    clearTimeout(timer2);
+    clearTimeout(timer3);
+    throw err;
   }
-
-  if (streamError) {
-    throw streamError;
-  }
-
-  if (!finalResult) {
-    throw new Error('Streaming completed without enhanced result');
-  }
-
-  return finalResult;
 }
 
 /**

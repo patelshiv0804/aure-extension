@@ -9,6 +9,7 @@ import {
   KeyRound, CheckCircle, RefreshCw, LogOut, Check, Sparkles
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
+import { getStorage } from '@/lib/storage';
 
 type AuthMode = 'signin' | 'signup' | 'forgot-email' | 'forgot-otp' | 'forgot-reset' | 'forgot-success';
 const OTP_LENGTH = 6;
@@ -232,9 +233,24 @@ export const AuthView: React.FC = () => {
     }
   };
 
-  const handleGoogleSignInClick = () => {
-    // Open web app auth page in new tab for Google OAuth login
-    chrome.tabs.create({ url: 'http://localhost:3000/auth' });
+  const handleGoogleSignInClick = async () => {
+    // Open configured web app auth page in new tab for Google OAuth login (AURE-02)
+    try {
+      const settings = await getStorage('settings');
+      const endpoint = (settings?.advanced as any)?.apiEndpoint;
+      let authUrl = 'http://localhost:3000/auth';
+      if (endpoint) {
+        try {
+          const parsed = new URL(endpoint);
+          if (parsed.protocol === 'https:') {
+            authUrl = `${parsed.origin}/auth`;
+          }
+        } catch {}
+      }
+      chrome.tabs.create({ url: authUrl });
+    } catch {
+      chrome.tabs.create({ url: 'http://localhost:3000/auth' });
+    }
   };
 
   // ── Authenticated User Profile View ───────────────────────
@@ -277,7 +293,7 @@ export const AuthView: React.FC = () => {
               <span className="text-slate-500 font-medium">Session Status</span>
               <span className="flex items-center gap-1.5 text-emerald-600 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                HTTP Cookie Session Active
+                Session Active
               </span>
             </div>
           </div>

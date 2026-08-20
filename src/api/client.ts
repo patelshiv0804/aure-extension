@@ -34,25 +34,45 @@ const DEFAULT_TIMEOUT = 120_000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY = 1000;
 
+function isLoopbackHost(hostname: string): boolean {
+  return (
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '::1' ||
+    hostname.endsWith('.localhost')
+  );
+}
+
 /**
  * Get the configured API base URL.
+ * Enforces HTTPS for all remote endpoints (AURE-02).
  */
 async function getBaseUrl(): Promise<string> {
   const settings = await getStorage('settings');
   const endpoint = (settings?.advanced as any)?.apiEndpoint || 'http://127.0.0.1:8000/api/v1';
+  try {
+    const url = new URL(endpoint);
+    if (!isLoopbackHost(url.hostname) && url.protocol !== 'https:') {
+      console.warn(`[AURE Security] Enforcing HTTPS for non-loopback API endpoint: ${endpoint}`);
+      return `https://${url.host}${url.pathname}`.replace(/\/$/, '');
+    }
+  } catch {}
   return endpoint.replace(/\/$/, '');
 }
 
 /**
- * Get the stored API token from HTTP cookie or storage.
+ * Get the stored API token from storage or HTTP cookie.
  */
 async function getApiToken(): Promise<string | undefined> {
+  const storedToken = (await getStorage('promptiq_token')) || (await getStorage('apiToken'));
+  if (storedToken && typeof storedToken === 'string' && storedToken.trim() !== '') {
+    return storedToken.trim();
+  }
   const cookieToken = await getAuthCookie();
-  if (cookieToken) return cookieToken;
-  const promptiqToken = await getStorage('promptiq_token');
-  if (promptiqToken) return promptiqToken;
-  const storageToken = await getStorage('apiToken');
-  return storageToken;
+  if (cookieToken && typeof cookieToken === 'string' && cookieToken.trim() !== '') {
+    return cookieToken.trim();
+  }
+  return undefined;
 }
 
 /**

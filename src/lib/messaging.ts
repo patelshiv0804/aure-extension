@@ -90,6 +90,21 @@ export function onMessage<T extends MessageType>(
 export function initMessageListener(): void {
   chrome.runtime.onMessage.addListener(
     (message: Message, sender, sendResponse) => {
+      // Enforce sender-level authorization (AURE-03): Reject messages not originating from this extension
+      if (sender.id !== chrome.runtime.id) {
+        console.warn(`[AURE Security] Rejected unauthorized message from external sender: ${sender.id}`);
+        sendResponse({
+          success: false,
+          error: 'Unauthorized message sender',
+          requestId: message?.requestId,
+        } satisfies MessageResponse);
+        return false;
+      }
+
+      if (!message || typeof message.type !== 'string') {
+        return false;
+      }
+
       const handler = handlers.get(message.type);
 
       if (!handler) {

@@ -178,6 +178,28 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         return;
       }
 
+      // Priority 1: Check login status before validating prompt or calling backend
+      await useAuthStore.getState().loadAuth();
+      if (isCancelledRef.current) return;
+
+      const { isAuthenticated, user } = useAuthStore.getState();
+      const cachedProfile = await getStorage('userProfile');
+
+      if (!isAuthenticated && !user && !cachedProfile) {
+        if (isCancelledRef.current) return;
+        useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
+        setFlowState('error');
+        // Open workspace sidepanel automatically for quick login
+        sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
+        setTimeout(() => {
+          if (useEnhanceStore.getState().flowState === 'error') {
+            useEnhanceStore.getState().reset();
+          }
+        }, 4000);
+        return;
+      }
+
+      // Priority 2: Check prompt presence
       const prompt = adapterRef.current.extractPrompt();
       if (!prompt.trim()) {
         useEnhanceStore.getState().setError('Please enter a prompt first.');
@@ -201,22 +223,6 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
       if (roleMode) useEnhanceStore.getState().setSelectedRoleMode(roleMode);
 
       try {
-        // Check login status before calling backend API
-        await useAuthStore.getState().loadAuth();
-        if (isCancelledRef.current) return;
-
-        const { isAuthenticated, user } = useAuthStore.getState();
-        const cachedProfile = await getStorage('userProfile');
-
-        if (!isAuthenticated && !user && !cachedProfile) {
-          if (isCancelledRef.current) return;
-          useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
-          setFlowState('error');
-          // Open workspace sidepanel automatically for quick login
-          sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
-          return;
-        }
-
         // Parallel: enhance + recommend
         const [result, recommendation] = await Promise.allSettled([
           sendMessage('ENHANCE_PROMPT', {
@@ -274,10 +280,29 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     [setCurrentPrompt, setFlowState, setEnhanceResult, setRecommendation, adapter, setIsUndone]
   );
 
-  const handleEnhanceClick = useCallback(() => {
+  const handleEnhanceClick = useCallback(async () => {
     if (isEnhancingRef.current || useEnhanceStore.getState().flowState === 'enhancing') {
       return;
     }
+
+    // Priority 1: Check login status
+    await useAuthStore.getState().loadAuth();
+    const { isAuthenticated, user } = useAuthStore.getState();
+    const cachedProfile = await getStorage('userProfile');
+
+    if (!isAuthenticated && !user && !cachedProfile) {
+      useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
+      setFlowState('error');
+      sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
+      setTimeout(() => {
+        if (useEnhanceStore.getState().flowState === 'error') {
+          useEnhanceStore.getState().reset();
+        }
+      }, 4000);
+      return;
+    }
+
+    // Priority 2: Check prompt
     const prompt = adapterRef.current.extractPrompt();
     if (!prompt.trim()) {
       useEnhanceStore.getState().setError('Please enter a prompt first.');
