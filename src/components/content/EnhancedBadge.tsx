@@ -6,6 +6,7 @@
 import React, { useState, useLayoutEffect, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
+import { getComposerRect, getLeftAnchor } from '@/lib/composer-anchor';
 import { RoleIcon } from '../common/RoleIcon';
 
 export interface PromptVersionItem {
@@ -77,42 +78,13 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
     return () => window.removeEventListener('mousedown', handleOutsideClick);
   }, [isDropdownOpen]);
 
-  // Compute exact position sticking to the top border of the chat area
+  // Compute position from the SHARED composer anchor so this left capsule
+  // stays aligned with the FloatingEnhanceButton (right capsule) and sits
+  // inset from the composer's LEFT border.
   const computePosition = useCallback(() => {
-    const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
-    if (!input) {
-      const rect = adapter.getInputRect();
-      if (rect) {
-        setPos({ top: Math.max(12, rect.top - 44), left: Math.max(12, rect.left) });
-      }
-      return;
-    }
-
-    // 1. Locate the outer chat composer container (e.g. form or composer wrapper)
-    const composer = input.closest('form, [data-composer-surface="true"], fieldset, div[class*="composer"]');
-    let targetRect: DOMRect = composer ? composer.getBoundingClientRect() : input.getBoundingClientRect();
-
-    // 2. Fallback: walk up parents if input rect is too narrow
-    if (!composer) {
-      let el: HTMLElement | null = input;
-      for (let i = 0; i < 6 && el; i++) {
-        const parent = el.parentElement;
-        if (parent) {
-          const pRect = parent.getBoundingClientRect();
-          if (pRect.width >= targetRect.width * 1.05 && pRect.width < window.innerWidth * 0.95) {
-            targetRect = pRect;
-            break;
-          }
-        }
-        el = parent;
-      }
-    }
-
-    // Position badge right above the top border of the chat composer
-    const top = Math.max(12, targetRect.top - 42);
-    const left = Math.max(12, targetRect.left + 8);
-
-    setPos({ top, left });
+    const rect = getComposerRect(adapter);
+    if (!rect) return;
+    setPos(getLeftAnchor(rect));
   }, [adapter]);
 
   useLayoutEffect(() => {

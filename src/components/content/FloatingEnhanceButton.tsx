@@ -5,6 +5,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
+import { getComposerRect, getRightAnchor } from '@/lib/composer-anchor';
 import { useEnhanceStore } from '@/stores/enhance.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { sendMessage } from '@/lib/messaging';
@@ -94,7 +95,10 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
   const activeWidth = flowState === 'enhancing' ? ENHANCING_BUTTON_WIDTH : BUTTON_WIDTH;
 
   const computePosition = useCallback(() => {
-    const rect = adapter.getInputRect();
+    // Anchor to the SAME composer rect the EnhancedBadge uses, so the two
+    // capsules line up with each other and sit inset from the composer's
+    // RIGHT border (symmetric with the left capsule).
+    const rect = getComposerRect(adapter);
 
     if (!rect || rect.width === 0) {
       if (lastValidPosition.current) {
@@ -103,39 +107,8 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
       return;
     }
 
-    const input = (adapter as any).currentInput ?? (adapter as any).detectInput?.();
-    let containerRect = rect;
-    if (input) {
-      let el: HTMLElement | null = input;
-      for (let i = 0; i < 6 && el; i++) {
-        const parent = el.parentElement;
-        if (parent) {
-          const pRect = parent.getBoundingClientRect();
-          if (pRect.width > containerRect.width * 1.1 && pRect.width < window.innerWidth * 0.9) {
-            containerRect = pRect;
-            break;
-          }
-        }
-        el = parent;
-      }
-    }
-
-    const x = containerRect.right - activeWidth;
-    const y = containerRect.top - BUTTON_HEIGHT - 6;
-
-    if (
-      x < 0 ||
-      y < -BUTTON_HEIGHT ||
-      x > window.innerWidth ||
-      y > window.innerHeight
-    ) {
-      if (lastValidPosition.current) {
-        setPosition(lastValidPosition.current);
-      }
-      return;
-    }
-
-    const next = { x, y, width: activeWidth };
+    const { top, left } = getRightAnchor(rect, activeWidth);
+    const next = { x: left, y: top, width: activeWidth };
     lastValidPosition.current = next;
     setPosition(next);
   }, [adapter, activeWidth]);

@@ -101,8 +101,31 @@ export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSi
     const formattedEnhanced = formatPromptText(backendData.enhanced_prompt);
     const originalWords = formattedOriginal.split(/\s+/).filter(Boolean).length;
     const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
-    const origAnalysis = (backendData.original_analysis ?? (backendData as any).old_analysis) as any;
-    const enhAnalysis = (backendData.enhanced_analysis ?? (backendData as any).new_analysis) as any;
+
+    const promptId =
+      backendData.version?.prompt_id ??
+      (backendData as any).prompt_id ??
+      response.prompt_id ??
+      undefined;
+
+    // Analyses/tools as returned directly by /enhance (present on older backends).
+    let origAnalysis = (backendData.original_analysis ?? (backendData as any).old_analysis) as any;
+    let enhAnalysis = (backendData.enhanced_analysis ?? (backendData as any).new_analysis) as any;
+    let toolRecommendations: any = backendData.tool_recommendations;
+
+    // The /enhance endpoint now computes quality scores in a background task and
+    // returns null analysis immediately. When that happens, fetch the real
+    // scores from the DB by polling GET /prompts/{prompt_id} until the
+    // background analysis lands. (Re-enhance is unaffected — it returns its
+    // scores inline and never reaches this path.)
+    if (promptId && !hasAnalysis(enhAnalysis) && !signal?.aborted) {
+      const fetched = await fetchEnhancedAnalysis(promptId, signal);
+      if (fetched) {
+        if (hasAnalysis(fetched.old_analysis)) origAnalysis = fetched.old_analysis;
+        if (hasAnalysis(fetched.new_analysis)) enhAnalysis = fetched.new_analysis;
+        if (fetched.tool_recommendations) toolRecommendations = fetched.tool_recommendations;
+      }
+    }
 
     const beforeScore = normalizeScore(
       origAnalysis?.overall_score ?? backendData.comparison?.before_score ?? backendData.analysis?.overall_score ?? 0
@@ -112,7 +135,7 @@ export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSi
     );
     const improvementScore = Math.max(0, afterScore - beforeScore);
 
-    const rawTools = backendData.tool_recommendations?.tools ?? [];
+    const rawTools = toolRecommendations?.tools ?? [];
     const toolRecs = rawTools.map((t: any) => {
       const name = t.name ?? 'AI Tool';
       const info = MODEL_MAP[name.toLowerCase()] ?? AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
@@ -122,12 +145,6 @@ export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSi
         url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
       };
     });
-
-    const promptId =
-      backendData.version?.prompt_id ??
-      (backendData as any).prompt_id ??
-      response.prompt_id ??
-      undefined;
 
     const result: EnhanceResult = {
       promptId,
@@ -154,7 +171,11 @@ export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSi
       toolRecommendations: toolRecs,
     };
 
-    enhanceCache.set(cacheKey, result);
+    // Only cache once the real scores have resolved, so a timed-out fetch does
+    // not pin fallback scores for the full cache TTL. Never cache a cancelled run.
+    if (!signal?.aborted && hasAnalysis(enhAnalysis)) {
+      enhanceCache.set(cacheKey, result);
+    }
     historyCache.clear();
     return result;
   }
@@ -310,5 +331,85 @@ function detectCategory(prompt: string): PromptCategory {
 
 function normalizeScore(score: number): number {
   if (!Number.isFinite(score)) return 0;
-  return Math.max(0, Math.min(100, score <= 10 ? Math.round(score * 10) : Math.round(score)));
+  // The backend scores every dimension and the overall score on a 0–100 scale
+  // (see prompt_analysis_service.py). Round and clamp only — do NOT rescale
+  // values <= 10, or a genuine low score like 10/100 wrongly becomes 100.
+  return Math.max(0, Math.min(100, Math.round(score)));
+}
+
+/**
+ * True when an analysis object carries real quality data (an overall score or
+ * scored dimensions). Used to detect the background-task-pending state where
+ * the /enhance response returns null/empty analysis.
+ */
+function hasAnalysis(analysis: any): boolean {
+  if (!analysis || typeof analysis !== 'object') return false;
+  if (typeof analysis.overall_score === 'number') return true;
+  if (
+    analysis.dimensions &&
+    typeof analysis.dimensions === 'object' &&
+    Object.keys(analysis.dimensions).length > 0
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+interface PromptDetailData {
+  old_analysis?: any;
+  new_analysis?: any;
+  grade?: string;
+  tool_recommendations?: any;
+}
+
+/**
+ * Poll GET /prompts/{prompt_id} until the background quality analysis has been
+ * written to the DB, then return it. Returns null if the analysis never lands
+ * within the polling window or the request is cancelled — the caller then keeps
+ * whatever the /enhance response provided.
+ *
+ * Deliberately omits a rateLimitKey so this internal polling never consumes the
+ * user-facing enhance/history rate-limit budget, and swallows transient errors
+ * (network/5xx/not-ready) so a single hiccup doesn't abort the whole flow.
+ */
+async function fetchEnhancedAnalysis(
+  promptId: string,
+  signal?: AbortSignal
+): Promise<PromptDetailData | null> {
+  const MAX_ATTEMPTS = 24;
+  const INTERVAL_MS = 1500;
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (signal?.aborted) return null;
+
+    try {
+      const response = await apiRequest<{ success?: boolean; data?: PromptDetailData }>({
+        method: 'GET',
+        path: `/prompts/${encodeURIComponent(promptId)}`,
+        timeout: 20_000,
+        retries: 0,
+        signal,
+      });
+
+      const data = response?.data;
+      if (data && hasAnalysis(data.new_analysis)) {
+        return data;
+      }
+    } catch (err: any) {
+      // Cancelled mid-poll — stop immediately so the caller can finish and the
+      // background service worker can clean up the persisted record.
+      if (signal?.aborted || err?.code === 'CANCELLED') return null;
+      // Otherwise a transient/not-ready error: fall through and retry.
+    }
+
+    if (attempt < MAX_ATTEMPTS - 1) {
+      await sleep(INTERVAL_MS);
+    }
+  }
+
+  return null;
 }

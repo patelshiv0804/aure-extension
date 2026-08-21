@@ -362,7 +362,10 @@ function normalizeCategory(value?: string): PromptCategory {
 
 function normalizeScore(score: number): number {
   if (!Number.isFinite(score)) return 0;
-  return Math.max(0, Math.min(100, score <= 10 ? Math.round(score * 10) : Math.round(score)));
+  // The backend scores every dimension and the overall score on a 0–100 scale
+  // (see prompt_analysis_service.py). Round and clamp only — do NOT rescale
+  // values <= 10, or a genuine low score like 10/100 wrongly becomes 100.
+  return Math.max(0, Math.min(100, Math.round(score)));
 }
 
 function extractDimScore(analysis: any, keys: string[], fallback: number): number {

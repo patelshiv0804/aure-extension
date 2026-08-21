@@ -120,7 +120,10 @@ function parseVersionAnalysis(oldAnRaw?: any, newAnRaw?: any) {
   const norm = (val: any) => {
     const num = Number(val);
     if (!Number.isFinite(num)) return 0;
-    return Math.max(0, Math.min(100, num <= 10 ? Math.round(num * 10) : Math.round(num)));
+    // The backend scores every dimension and the overall score on a 0–100 scale
+    // (see prompt_analysis_service.py). Round and clamp only — do NOT rescale
+    // values <= 10, or a genuine low score like 10/100 wrongly becomes 100.
+    return Math.max(0, Math.min(100, Math.round(num)));
   };
 
   const getScore = (an: any, keys: string[]) => {
