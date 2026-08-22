@@ -10,7 +10,10 @@ import DOMPurify from 'dompurify';
 export function sanitizeHTML(dirty: string): string {
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS: ['b', 'i', 'em', 'strong', 'span', 'br', 'p', 'div', 'code', 'pre'],
-    ALLOWED_ATTR: ['class', 'style'],
+    // 'style' is intentionally excluded: inline styles enable CSS-based data
+    // exfiltration / UI-redressing injections (AURE-09). Styling comes from
+    // the extension's own classes via ALLOWED_ATTR: ['class'].
+    ALLOWED_ATTR: ['class'],
   });
 }
 

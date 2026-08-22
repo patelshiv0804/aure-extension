@@ -20,26 +20,38 @@ const AI_HOSTS = [
   'deepseek.com', 'copilot.microsoft.com',
 ];
 
-/** Find the best target tab without fetching all tabs. */
-async function findTargetTab(): Promise<chrome.tabs.Tab | undefined> {
-  // Step 1: active tab in the last focused window (cheapest query)
-  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (activeTab?.url && (activeTab.url.startsWith('http://') || activeTab.url.startsWith('https://'))) {
-    return activeTab;
+/** True only for URLs on a supported AI platform. */
+function isAiHostUrl(url?: string): boolean {
+  if (!url) return false;
+  try {
+    const { hostname } = new URL(url);
+    return AI_HOSTS.some((h) => hostname === h || hostname.endsWith('.' + h));
+  } catch {
+    return false;
   }
+}
 
-  // Step 2: any active tab across windows
+/**
+ * Find a supported AI-platform tab to fill. Only ever returns a tab on a
+ * supported AI host — it never falls back to arbitrary/unrelated tabs, so the
+ * enhanced prompt can't be injected into an unexpected page (AURE-05).
+ */
+async function findTargetTab(): Promise<chrome.tabs.Tab | undefined> {
+  // Step 1: active tab in the last focused window — only if it is an AI host.
+  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (isAiHostUrl(activeTab?.url)) return activeTab;
+
+  // Step 2: any active tab across windows on a supported AI host.
   const activeTabs = await chrome.tabs.query({ active: true });
-  const activeAI = activeTabs.find((t) => t.url && AI_HOSTS.some((h) => t.url!.includes(h)));
+  const activeAI = activeTabs.find((t) => isAiHostUrl(t.url));
   if (activeAI) return activeAI;
 
-  // Step 3: any AI host tab (narrowly filtered)
+  // Step 3: any open tab on a supported AI host (narrowly filtered).
   const aiTabs = await chrome.tabs.query({ url: AI_HOSTS.map((h) => `*://${h}/*`) });
   if (aiTabs.length) return aiTabs[0];
 
-  // Step 4: any active http tab
-  const anyActive = activeTabs.find((t) => t.url && (t.url.startsWith('http://') || t.url.startsWith('https://')));
-  return anyActive;
+  // No supported AI tab is open — do NOT target arbitrary tabs.
+  return undefined;
 }
 
 async function fillPromptInTab(text: string): Promise<boolean> {
@@ -47,67 +59,15 @@ async function fillPromptInTab(text: string): Promise<boolean> {
     const target = await findTargetTab();
     if (!target?.id) return false;
 
-    // PRIMARY: send to the already-running content script — fast, no script injection overhead
+    // Send to the already-running content script on the supported AI tab.
+    // If no content script is present we intentionally do NOT fall back to
+    // chrome.scripting.executeScript — that would run injected code on an
+    // arbitrary page and requires the broad "scripting" permission. The caller
+    // copies the text to the clipboard as a graceful fallback instead (AURE-05).
     try {
       await chrome.tabs.sendMessage(target.id, { type: 'FILL_PROMPT', payload: { text } });
       return true;
     } catch {
-      // Content script not loaded on this tab (e.g. non-AI page), fall through to executeScript
-    }
-
-    // FALLBACK: inject script directly (works on any page, slower)
-    try {
-      await chrome.scripting.executeScript({
-        target: { tabId: target.id },
-        func: (promptText: string) => {
-          const selectors = [
-            '#prompt-textarea',
-            'div[contenteditable="true"][data-placeholder]',
-            'div[contenteditable="true"][aria-label]',
-            'div[contenteditable="true"]',
-            'textarea',
-            'div[role="textbox"]',
-          ];
-          let input: HTMLElement | null = null;
-          for (const sel of selectors) {
-            const el = document.querySelector<HTMLElement>(sel);
-            if (el && el.isConnected) { input = el; break; }
-          }
-          if (!input) return false;
-
-          input.focus();
-
-          if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
-            const nativeSetter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(input), 'value')?.set;
-            if (nativeSetter) nativeSetter.call(input, promptText);
-            else input.value = promptText;
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            return true;
-          }
-
-          if (input.getAttribute('contenteditable') === 'true' || input.isContentEditable) {
-            document.execCommand('selectAll', false);
-            if (!document.execCommand('insertText', false, promptText)) {
-              const sel = window.getSelection();
-              const range = document.createRange();
-              range.selectNodeContents(input);
-              sel?.removeAllRanges();
-              sel?.addRange(range);
-              document.execCommand('insertText', false, promptText);
-            }
-            input.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, cancelable: true, inputType: 'insertText', data: promptText }));
-            input.dispatchEvent(new InputEvent('input', { bubbles: true, cancelable: true, inputType: 'insertText', data: promptText }));
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            return true;
-          }
-          return false;
-        },
-        args: [text],
-      });
-      return true;
-    } catch (scriptErr) {
-      console.warn('[AURE] executeScript also failed:', scriptErr);
       return false;
     }
   } catch (err) {

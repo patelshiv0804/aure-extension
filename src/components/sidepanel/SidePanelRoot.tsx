@@ -71,7 +71,7 @@ export const SidePanelRoot: React.FC = () => {
     const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
       if (
         areaName === 'local' &&
-        (changes['userProfile'] || changes['promptiq_token'] || changes['apiToken'] || changes['currentUserEmail'])
+        (changes['userProfile'] || changes['currentUserEmail'])
       ) {
         loadAuth();
       }

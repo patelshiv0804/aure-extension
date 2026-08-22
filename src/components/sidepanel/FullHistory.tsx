@@ -67,12 +67,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
 
     const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
       if (areaName === 'local') {
-        if (
-          changes['userProfile'] ||
-          changes['promptiq_token'] ||
-          changes['apiToken'] ||
-          changes['currentUserEmail']
-        ) {
+        if (changes['userProfile'] || changes['currentUserEmail']) {
           loadAuth();
         }
         if (changes['last_history_update']) {

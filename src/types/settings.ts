@@ -27,20 +27,11 @@ export interface ExtensionSettings {
     showRecommendations: boolean;
   };
 
-  // Privacy
-  privacy: {
-    localOnly: boolean;
-    cloudSync: boolean;
-    saveHistory: boolean;
-    encryptData: boolean;
-  };
-
   // Advanced
   advanced: {
     customSelectors: Record<string, string[]>;
     customPromptTemplates: CustomPromptTemplate[];
     apiEndpoint?: string;
-    apiKey?: string;
     currentUserEmail?: string;
     debugMode: boolean;
   };
@@ -70,12 +61,6 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     preferredModels: ['claude', 'chatgpt', 'gemini'],
     recommendationSensitivity: 70,
     showRecommendations: true,
-  },
-  privacy: {
-    localOnly: false,
-    cloudSync: true,
-    saveHistory: true,
-    encryptData: false,
   },
   advanced: {
     customSelectors: {},

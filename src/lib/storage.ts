@@ -18,8 +18,8 @@ export interface UserProfile {
 /** Keys and their types for chrome.storage */
 interface StorageSchema {
   settings: ExtensionSettings;
-  apiToken: string;
-  promptiq_token: string;
+  // Note: the auth bearer token is intentionally NOT stored here. It lives in
+  // memory-only chrome.storage.session via lib/token-store.ts (AURE-01).
   currentUserEmail: string;
   userProfile: UserProfile;
   floatingButtonPosition: { x: number; y: number };

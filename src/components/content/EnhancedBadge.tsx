@@ -151,6 +151,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           boxShadow: '0 4px 20px rgba(124, 92, 252, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           userSelect: 'none',
+          overflow: 'hidden',
         }}
       >
         {/* Version Dropdown (when multiple versions exist) OR Standard Undo Button */}
@@ -422,7 +423,16 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
         >
           {isReenhancing ? (
             <>
-              <RoleIcon name="Loader2" size={12} strokeWidth={2.5} className="animate-spin text-purple-600" />
+              <RoleIcon
+                name="Loader2"
+                size={12}
+                strokeWidth={2.5}
+                style={{
+                  animation: 'pe-spin 0.75s linear infinite',
+                  flexShrink: 0,
+                  color: '#7C5CFC',
+                }}
+              />
               <span>Re-enhancing</span>
               <span
                 style={{

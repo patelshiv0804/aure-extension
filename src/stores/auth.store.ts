@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import { apiRequest, ApiError } from '@/api/client';
 import { getStorage, setStorage, removeStorage, UserProfile } from '@/lib/storage';
 import { getAuthCookie, setAuthCookie, removeAuthCookie } from '@/lib/cookies';
+import { getToken, setToken, clearToken } from '@/lib/token-store';
 import { historyCache, enhanceCache } from '@/lib/cache';
 
 interface AuthState {
@@ -38,10 +39,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loadAuth: async () => {
     set({ loading: true });
     try {
-      const storedToken = (await getStorage('promptiq_token')) || (await getStorage('apiToken'));
+      const sessionToken = await getToken();
       const cookieToken = await getAuthCookie();
-      const token = (storedToken && storedToken.trim()) || (cookieToken && cookieToken.trim()) || null;
+      const token = (sessionToken && sessionToken.trim()) || (cookieToken && cookieToken.trim()) || null;
       const cachedProfile = await getStorage('userProfile');
+
+      // After a browser restart the in-memory session token is gone, but the
+      // persistent httpOnly cookie survives. Promote it back into the session
+      // store so the background proxy can attach it to requests (AURE-01).
+      if (!sessionToken && cookieToken && token) {
+        try { await setToken(token); } catch { /* non-fatal */ }
+      }
 
       // Pre-set cached identity for instant UI render while backend session is validated
       if (token && cachedProfile) {
@@ -66,8 +74,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           if (err instanceof ApiError && err.status === 401) {
             await removeStorage('userProfile');
             await removeStorage('currentUserEmail');
-            await removeStorage('promptiq_token');
-            await removeStorage('apiToken');
+            await clearToken();
             await removeAuthCookie();
             set({ user: null, token: null, isAuthenticated: false });
           } else if (cachedProfile) {
@@ -106,8 +113,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const accessToken = response.access_token;
-      await setStorage('promptiq_token', accessToken);
-      await setStorage('apiToken', accessToken);
+      await setToken(accessToken);
       await setAuthCookie(accessToken);
       set({ token: accessToken });
 
@@ -171,8 +177,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       const accessToken = response.access_token;
-      await setStorage('promptiq_token', accessToken);
-      await setStorage('apiToken', accessToken);
+      await setToken(accessToken);
       await setAuthCookie(accessToken);
       set({ token: accessToken });
 
@@ -236,8 +241,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       await removeStorage('userProfile');
       await removeStorage('currentUserEmail');
-      await removeStorage('promptiq_token');
-      await removeStorage('apiToken');
+      await clearToken();
       await removeAuthCookie();
       historyCache.clear();
       enhanceCache.clear();
@@ -250,12 +254,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
   chrome.storage.onChanged.addListener((changes, areaName) => {
     if (areaName === 'local') {
-      if (
-        changes['userProfile'] ||
-        changes['currentUserEmail'] ||
-        changes['promptiq_token'] ||
-        changes['apiToken']
-      ) {
+      // userProfile / currentUserEmail are written and cleared on every auth
+      // transition (login, logout, 401), so watching them here covers all
+      // token changes without exposing the token in a disk-backed area.
+      if (changes['userProfile'] || changes['currentUserEmail']) {
         useAuthStore.getState().loadAuth();
       }
     }

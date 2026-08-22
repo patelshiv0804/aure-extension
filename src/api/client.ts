@@ -2,8 +2,9 @@
 // API Client — Centralized HTTP client with retry & interceptors
 // ──────────────────────────────────────────────────────────────
 
-import { getStorage } from '@/lib/storage';
 import { getAuthCookie } from '@/lib/cookies';
+import { resolveApiBaseUrl } from '@/lib/endpoint';
+import { getToken } from '@/lib/token-store';
 import { checkRateLimit, getRetryAfter } from '@/lib/rate-limiter';
 
 export class ApiError extends Error {
@@ -34,40 +35,22 @@ const DEFAULT_TIMEOUT = 120_000;
 const MAX_RETRIES = 3;
 const RETRY_BASE_DELAY = 1000;
 
-function isLoopbackHost(hostname: string): boolean {
-  return (
-    hostname === 'localhost' ||
-    hostname === '127.0.0.1' ||
-    hostname === '::1' ||
-    hostname.endsWith('.localhost')
-  );
-}
-
 /**
- * Get the configured API base URL.
- * Enforces HTTPS for all remote endpoints (AURE-02).
+ * Get the validated API base URL. The endpoint is resolved through the
+ * allow-list in lib/endpoint.ts, which rejects untrusted hosts and enforces
+ * HTTPS for remote endpoints (AURE-07 / AURE-02).
  */
 async function getBaseUrl(): Promise<string> {
-  const settings = await getStorage('settings');
-  const endpoint = (settings?.advanced as any)?.apiEndpoint || 'http://127.0.0.1:8000/api/v1';
-  try {
-    const url = new URL(endpoint);
-    if (!isLoopbackHost(url.hostname) && url.protocol !== 'https:') {
-      console.warn(`[AURE Security] Enforcing HTTPS for non-loopback API endpoint: ${endpoint}`);
-      return `https://${url.host}${url.pathname}`.replace(/\/$/, '');
-    }
-  } catch {}
-  return endpoint.replace(/\/$/, '');
+  return resolveApiBaseUrl();
 }
 
 /**
- * Get the stored API token from storage or HTTP cookie.
+ * Get the stored API token from the secure session store or HTTP cookie.
  */
 async function getApiToken(): Promise<string | undefined> {
-  const storedToken = (await getStorage('promptiq_token')) || (await getStorage('apiToken'));
-  if (storedToken && typeof storedToken === 'string' && storedToken.trim() !== '') {
-    return storedToken.trim();
-  }
+  const sessionToken = await getToken();
+  if (sessionToken) return sessionToken;
+
   const cookieToken = await getAuthCookie();
   if (cookieToken && typeof cookieToken === 'string' && cookieToken.trim() !== '') {
     return cookieToken.trim();
