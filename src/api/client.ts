@@ -76,9 +76,125 @@ async function getApiToken(): Promise<string | undefined> {
 }
 
 /**
+ * Detect whether this code is running inside a content script injected into a
+ * web page — as opposed to the background service worker or an extension page
+ * (popup / side panel / options).
+ *
+ * Why it matters for CORS:
+ *  - Background service worker: no `window` (ServiceWorkerGlobalScope). Its
+ *    fetches to hosts in `host_permissions` BYPASS CORS entirely.
+ *  - Extension pages: origin is `chrome-extension://<id>`, allowed by the
+ *    backend's CORS_ORIGIN_REGEX.
+ *  - Content script: runs in the host page (e.g. https://gemini.google.com), so
+ *    the browser attaches the PAGE's origin and enforces CORS. That origin is
+ *    not allowed by the backend, so a direct credentialed fetch fails the
+ *    preflight with 400. Such requests must be proxied through the background.
+ */
+function isContentScriptContext(): boolean {
+  try {
+    return (
+      typeof window !== 'undefined' &&
+      typeof location !== 'undefined' &&
+      location.protocol !== 'chrome-extension:' &&
+      typeof chrome !== 'undefined' &&
+      !!chrome.runtime?.id
+    );
+  } catch {
+    return false;
+  }
+}
+
+type SerializedBody = { kind: 'none' | 'json' | 'form'; value?: unknown };
+
+/** Package a request body into a form that survives chrome.runtime messaging. */
+function serializeBody(body: unknown): SerializedBody {
+  if (body === undefined || body === null) return { kind: 'none' };
+  if (body instanceof URLSearchParams) return { kind: 'form', value: body.toString() };
+  if (body instanceof FormData) {
+    const obj: Record<string, string> = {};
+    body.forEach((v, k) => {
+      obj[k] = String(v);
+    });
+    return { kind: 'form', value: new URLSearchParams(obj).toString() };
+  }
+  return { kind: 'json', value: body };
+}
+
+/**
+ * Forward an API request to the background service worker, which performs the
+ * actual (CORS-free) fetch. ApiError status codes are preserved across the
+ * messaging boundary so callers (e.g. auth 401 handling) keep working.
+ */
+async function proxyRequestThroughBackground<T>(config: RequestConfig): Promise<T> {
+  const body = serializeBody(config.body);
+  const message = {
+    type: 'API_REQUEST' as const,
+    payload: {
+      method: config.method,
+      path: config.path,
+      body: body.value,
+      bodyKind: body.kind,
+      params: config.params,
+      headers: config.headers,
+      rateLimitKey: config.rateLimitKey,
+      retries: config.retries,
+      timeout: config.timeout,
+    },
+    requestId: `api-${Date.now()}`,
+  };
+
+  const MAX_SEND_ATTEMPTS = 2;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt <= MAX_SEND_ATTEMPTS; attempt++) {
+    try {
+      const response: any = await chrome.runtime.sendMessage(message);
+      if (!response) throw new Error('No response from background service worker');
+      if (!response.success) {
+        throw new ApiError(response.error ?? 'Background messaging failed', 0, 'MESSAGING_ERROR');
+      }
+      const envelope = response.data as {
+        ok: boolean;
+        data?: unknown;
+        error?: { message: string; status: number; code?: string; retryAfter?: number };
+      };
+      if (!envelope?.ok) {
+        const e = envelope?.error ?? { message: 'API request failed', status: 0 };
+        throw new ApiError(e.message, e.status ?? 0, e.code, e.retryAfter);
+      }
+      return envelope.data as T;
+    } catch (err) {
+      if (err instanceof ApiError) throw err;
+      lastErr = err;
+      const msg = err instanceof Error ? err.message : String(err);
+      const portClosed =
+        msg.includes('message port closed') ||
+        msg.includes('Could not establish connection') ||
+        msg.includes('Receiving end does not exist');
+      if (portClosed && attempt < MAX_SEND_ATTEMPTS) {
+        await sleep(300);
+        continue;
+      }
+      throw new ApiError(msg, 0, 'NETWORK_ERROR');
+    }
+  }
+  throw new ApiError(
+    lastErr instanceof Error ? lastErr.message : 'Proxy failed',
+    0,
+    'NETWORK_ERROR'
+  );
+}
+
+/**
  * Make an authenticated API request with retry logic and cookie credentials.
  */
 export async function apiRequest<T>(config: RequestConfig): Promise<T> {
+  // Content scripts run in the host page's origin (e.g. https://gemini.google.com)
+  // and are subject to CORS. Forward to the background service worker, whose
+  // fetches bypass CORS. No-op in the background / extension pages.
+  if (isContentScriptContext()) {
+    return proxyRequestThroughBackground<T>(config);
+  }
+
   // Rate limit check
   if (config.rateLimitKey && !checkRateLimit(config.rateLimitKey)) {
     const retryAfter = getRetryAfter(config.rateLimitKey);
@@ -92,11 +208,6 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
 
   const baseUrl = await getBaseUrl();
   const token = await getApiToken();
-  const storedEmail = await getStorage('currentUserEmail');
-  const profile = await getStorage('userProfile');
-  const currentUserEmail = (typeof storedEmail === 'string' && storedEmail.trim())
-    ? storedEmail.trim()
-    : profile?.email;
 
   let url = `${baseUrl}${config.path}`;
 
@@ -114,10 +225,6 @@ export async function apiRequest<T>(config: RequestConfig): Promise<T> {
 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  if (currentUserEmail) {
-    headers['X-Current-User'] = currentUserEmail;
   }
 
   const retries = config.retries ?? MAX_RETRIES;
@@ -232,10 +339,6 @@ export async function apiStreamRequest(
 ): Promise<void> {
   const baseUrl = await getBaseUrl();
   const token = await getApiToken();
-  const storedEmail = await getStorage('currentUserEmail');
-  const profile = await getStorage('userProfile');
-  const currentUserEmail =
-    typeof storedEmail === 'string' && storedEmail.trim() ? storedEmail.trim() : profile?.email;
 
   let url = `${baseUrl}${config.path}`;
   if (config.params) {
@@ -250,7 +353,6 @@ export async function apiStreamRequest(
   };
 
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  if (currentUserEmail) headers['X-Current-User'] = currentUserEmail;
 
   if (config.signal?.aborted) {
     throw new ApiError('Request cancelled by user', 499, 'CANCELLED');

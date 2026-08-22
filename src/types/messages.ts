@@ -73,6 +73,28 @@ export interface MessageMap {
     response: CategoryClassification;
   };
 
+  // Generic API proxy — lets content scripts (which are subject to CORS on the
+  // host page's origin) route HTTP calls through the background service worker,
+  // whose fetches to host_permissions hosts bypass CORS entirely.
+  API_REQUEST: {
+    payload: {
+      method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+      path: string;
+      body?: unknown;
+      bodyKind?: 'none' | 'json' | 'form';
+      params?: Record<string, string>;
+      headers?: Record<string, string>;
+      rateLimitKey?: string;
+      retries?: number;
+      timeout?: number;
+    };
+    response: {
+      ok: boolean;
+      data?: unknown;
+      error?: { message: string; status: number; code?: string; retryAfter?: number };
+    };
+  };
+
   // Settings
   GET_SETTINGS: {
     payload: undefined;

@@ -5,6 +5,7 @@
 
 import { initMessageListener, onMessage } from '@/lib/messaging';
 import { migrateStorageIfNeeded, getSettings, updateSettings } from '@/lib/storage';
+import { apiRequest, ApiError } from '@/api/client';
 import { enhancePrompt, enhancePromptStream, reenhancePrompt, saveEnhancedPrompt } from '@/api/enhance';
 import { saveVersion, getVersions } from '@/api/versions';
 import { getPromptHistory, deletePrompt } from '@/api/history';
@@ -202,6 +203,44 @@ export default defineBackground(() => {
       category: payload.category,
       current_model: payload.currentModel,
     });
+  });
+
+  // Generic API proxy for content scripts. A content script's own fetch carries
+  // the host page's origin (e.g. https://gemini.google.com) and is blocked by
+  // the backend's CORS policy; routing it through the background performs a
+  // CORS-free request instead. ApiError status codes are preserved so callers
+  // (e.g. auth 401 handling) still behave correctly.
+  onMessage('API_REQUEST', async (payload) => {
+    const body =
+      payload.bodyKind === 'form'
+        ? new URLSearchParams(payload.body as string)
+        : payload.bodyKind === 'json'
+          ? payload.body
+          : undefined;
+    try {
+      const data = await apiRequest({
+        method: payload.method,
+        path: payload.path,
+        body,
+        params: payload.params,
+        headers: payload.headers,
+        rateLimitKey: payload.rateLimitKey,
+        retries: payload.retries,
+        timeout: payload.timeout,
+      });
+      return { ok: true, data };
+    } catch (err) {
+      if (err instanceof ApiError) {
+        return {
+          ok: false,
+          error: { message: err.message, status: err.status, code: err.code, retryAfter: err.retryAfter },
+        };
+      }
+      return {
+        ok: false,
+        error: { message: err instanceof Error ? err.message : 'Unknown error', status: 0, code: 'NETWORK_ERROR' },
+      };
+    }
   });
 
   onMessage('GET_SETTINGS', async () => {
