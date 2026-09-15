@@ -177,10 +177,14 @@ export const PromptHistory: React.FC = () => {
                         {prompt.originalText}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-slate-400/60">
-                          {prompt.platform}
-                        </span>
-                        <span className="text-[10px] text-slate-900/10">•</span>
+                        {prompt.platform && prompt.platform.toLowerCase() !== 'promptiq' && (
+                          <>
+                            <span className="text-[10px] text-slate-400/60">
+                              {prompt.platform}
+                            </span>
+                            <span className="text-[10px] text-slate-900/10">•</span>
+                          </>
+                        )}
                         <span className="text-[10px] text-slate-400/60">
                           {formatTime(prompt.createdAt)}
                         </span>

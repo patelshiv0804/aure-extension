@@ -284,7 +284,7 @@ export const AuthView: React.FC = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h3 className="text-base font-bold" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
-                  {user.display_name || 'PromptIQ User'}
+                  {user.display_name || 'AURE User'}
                 </h3>
                 <span
                   className="px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded-full"
@@ -392,8 +392,8 @@ export const AuthView: React.FC = () => {
             {mode === 'forgot-success' && 'Password Reset!'}
           </h2>
           <p className="text-xs font-medium" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
-            {mode === 'signin' && 'Sign in to continue to PromptIQ'}
-            {mode === 'signup' && 'Register your PromptIQ developer profile'}
+            {mode === 'signin' && 'Sign in to continue to AURE'}
+            {mode === 'signup' && 'Register your AURE developer profile'}
             {mode === 'forgot-email' && 'Enter your email to receive a 6-digit reset code'}
             {mode === 'forgot-otp' && `Enter the 6-digit code sent to ${email}`}
             {mode === 'forgot-reset' && 'Choose a strong password (at least 8 characters)'}

@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { sendMessage } from '@/lib/messaging';
 import type { PromptVersion, PromptAnalysisData } from '@/types/prompt';
 import { RoleIcon } from '../common/RoleIcon';
+import { FormattedPromptViewer } from '../common/FormattedPromptViewer';
 import { useTheme } from '@/hooks/useTheme';
 
 interface VersionTimelineProps {
@@ -297,7 +298,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04 }}
-              className="rounded-2xl p-4 transition-all"
+              className="rounded-2xl transition-all overflow-hidden flex flex-col"
               style={{
                 background: isDark ? D.surfaceElevated : '#FFFFFF',
                 border: `1px solid ${
@@ -310,11 +311,14 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                   : '0 2px 10px rgba(109, 40, 217, 0.04)',
               }}
             >
-              {/* Card Header Bar: All 4 items in one clean line */}
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2 flex-shrink-0">
+              {/* 1. TOP: All 4 items in one line */}
+              <div
+                className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b"
+                style={{ borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)' }}
+              >
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <span
-                    className="px-2.5 py-1 text-xs font-extrabold rounded-lg flex-shrink-0"
+                    className="px-2 py-0.5 text-[11px] font-extrabold rounded-md flex-shrink-0"
                     style={{
                       background:
                         version.source === 'enhanced'
@@ -327,7 +331,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                   </span>
 
                   <span
-                    className="px-2 py-0.5 text-[11px] font-semibold rounded-full capitalize flex-shrink-0"
+                    className="px-2 py-0.5 text-[10.5px] font-semibold rounded-full capitalize flex-shrink-0"
                     style={{
                       backgroundColor:
                         version.source === 'enhanced'
@@ -356,19 +360,19 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     onClick={(e) => handleAutoFill(e, version.text, version.id)}
-                    className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all shadow-sm active:scale-95 cursor-pointer"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
                     style={{
                       background: 'linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)',
                     }}
                     title="Auto-fill in active AI Chat Input"
                   >
-                    <RoleIcon name={isFilled ? 'Check' : 'ArrowUpRight'} size={13} strokeWidth={2.5} />
+                    <RoleIcon name={isFilled ? 'Check' : 'ArrowUpRight'} size={12} strokeWidth={2.5} />
                     <span>{isFilled ? 'Filled!' : 'Fill Input'}</span>
                   </button>
 
                   <button
                     onClick={(e) => handleCopy(e, version.text, version.id)}
-                    className="p-1.5 rounded-xl transition-all cursor-pointer flex items-center justify-center"
+                    className="p-1 rounded-lg transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
                     style={{
                       color: isCopied ? '#10B981' : isDark ? D.textMuted : '#64748B',
                       background: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
@@ -376,60 +380,60 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                     }}
                     title="Copy Prompt"
                   >
-                    <RoleIcon name={isCopied ? 'Check' : 'Copy'} size={14} />
+                    <RoleIcon name={isCopied ? 'Check' : 'Copy'} size={13} />
                   </button>
                 </div>
               </div>
 
-              {/* ── BIG WINDOW PROMPT DISPLAY ────────────────── */}
+              {/* 2. MIDDLE: Enhanced prompt formatted with Section Badges, bullets & clean code blocks */}
               <div
-                className="overflow-y-auto p-4 rounded-xl text-[13px] leading-relaxed select-text whitespace-pre-wrap transition-colors scrollbar-thin"
+                className="overflow-y-auto px-3.5 py-3 text-[11.5px] leading-relaxed select-text transition-colors scrollbar-thin font-sans"
                 style={{
-                  background: isDark ? D.surface2 : '#F8FAFC',
-                  border: `1px solid ${isDark ? D.borderSubtle : 'rgba(226, 232, 240, 0.9)'}`,
-                  color: isDark ? D.textPrimary : '#1E293B',
-                  minHeight: 180,
-                  maxHeight: 380,
-                  boxShadow: isDark
-                    ? 'inset 0 1px 3px rgba(0, 0, 0, 0.4)'
-                    : 'inset 0 1px 3px rgba(0, 0, 0, 0.02)',
+                  color: isDark ? '#E2E8F0' : '#1E293B',
+                  minHeight: 140,
+                  maxHeight: 340,
                 }}
               >
-                {version.text}
+                <FormattedPromptViewer content={version.text} fontSize={11.5} />
               </div>
 
-              {/* ── Score Strip & 6 Dimension Breakdown ─────── */}
+              {/* 3. BOTTOM: Integrated Score Strip & Dimension Breakdown */}
               {curAnalysis && (
-                <div className="mt-3">
+                <div
+                  className="border-t transition-colors mt-auto"
+                  style={{ borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)' }}
+                >
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
                       setExpandedVersionId(isExpanded ? null : version.id);
                     }}
-                    className="w-full p-3 rounded-xl transition-all text-left flex items-center justify-between shadow-xs group cursor-pointer"
+                    className="w-full px-3.5 py-2.5 transition-all text-left flex items-center justify-between group cursor-pointer"
                     style={{
-                      background: isDark ? D.surface2 : '#F8F9FE',
-                      border: `1px solid ${isDark ? D.borderSubtle : '#ECE9FF'}`,
+                      background: isDark ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.015)',
                     }}
                   >
-                    <div>
-                      <p
-                        className="text-[10px] font-bold tracking-wider uppercase mb-0.5"
-                        style={{ color: isDark ? '#A78BFA' : '#7C3AED' }}
+                    <div
+                      className="flex items-center gap-2 px-2.5 py-0.5 rounded-full"
+                      style={{
+                        background: isDark ? 'rgba(139, 92, 246, 0.12)' : '#EDE9FE',
+                        border: `1px solid ${isDark ? 'rgba(139, 92, 246, 0.25)' : 'rgba(167, 139, 250, 0.4)'}`,
+                      }}
+                    >
+                      <span
+                        className="text-[9.5px] font-bold tracking-wider uppercase"
+                        style={{ color: isDark ? '#C084FC' : '#7C3AED' }}
                       >
                         SCORE
-                      </p>
-                      <div className="flex items-center gap-1.5 font-mono">
-                        <span
-                          className="font-semibold text-sm"
-                          style={{ color: isDark ? D.textMuted : '#94A3B8' }}
-                        >
+                      </span>
+                      <div className="flex items-center gap-1.5 font-mono text-xs">
+                        <span style={{ color: isDark ? D.textMuted : '#94A3B8' }}>
                           {curAnalysis.beforeScore}
                         </span>
-                        <span style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#CBD5E1' }} className="text-xs">
+                        <span style={{ color: isDark ? 'rgba(255,255,255,0.3)' : '#CBD5E1' }}>
                           →
                         </span>
-                        <span className="font-bold text-base text-emerald-500">
+                        <span className="font-bold text-emerald-500">
                           {curAnalysis.afterScore}
                         </span>
                       </div>
@@ -438,19 +442,19 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                     <div className="flex items-center gap-2">
                       {curAnalysis.afterScore > curAnalysis.beforeScore ? (
                         <span
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shadow-2xs"
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold"
                           style={{
                             background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
                             color: isDark ? '#34D399' : '#059669',
                             border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.3)' : 'rgba(167, 243, 208, 0.7)'}`,
                           }}
                         >
-                          <RoleIcon name="TrendingUp" size={12} />
+                          <RoleIcon name="TrendingUp" size={11} />
                           +{curAnalysis.afterScore - curAnalysis.beforeScore} pts
                         </span>
                       ) : (
                         <span
-                          className="px-2.5 py-1 rounded-full text-[11px] font-bold"
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold"
                           style={{
                             background: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
                             color: isDark ? D.textMuted : '#64748B',
@@ -461,14 +465,13 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                         </span>
                       )}
                       <div
-                        className="w-6 h-6 rounded-full flex items-center justify-center transition-colors"
+                        className="w-5 h-5 rounded-full flex items-center justify-center transition-colors"
                         style={{
-                          background: isDark ? D.surfaceElevated : '#FFFFFF',
-                          border: `1px solid ${isDark ? D.borderSubtle : '#E2E8F0'}`,
+                          background: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
                           color: isDark ? D.textMuted : '#94A3B8',
                         }}
                       >
-                        <RoleIcon name={isExpanded ? 'ChevronUp' : 'ChevronDown'} size={13} />
+                        <RoleIcon name={isExpanded ? 'ChevronUp' : 'ChevronDown'} size={11} />
                       </div>
                     </div>
                   </button>
@@ -480,12 +483,13 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="overflow-hidden"
+                        className="overflow-hidden px-3.5 pb-3 border-t"
+                        style={{ borderColor: isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.04)' }}
                       >
-                        <div className="mt-2.5 space-y-2">
+                        <div className="pt-2.5 space-y-2">
                           <p
                             style={{
-                              fontSize: 11,
+                              fontSize: 10,
                               fontWeight: 700,
                               color: isDark ? D.textMuted : '#64748B',
                               textTransform: 'uppercase',
@@ -496,15 +500,15 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                             6 Dimension Breakdown
                           </p>
 
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-2 gap-1.5">
                             {curAnalysis.dimensions?.map((dim) => (
                               <div
                                 key={dim.name}
                                 style={{
-                                  background: isDark ? D.surface2 : '#FFFFFF',
-                                  border: `1.5px solid ${isDark ? D.borderSubtle : '#E8E4F8'}`,
-                                  borderRadius: 14,
-                                  padding: '10px 12px',
+                                  background: isDark ? D.surface2 : '#F8FAFC',
+                                  border: `1px solid ${isDark ? D.borderSubtle : '#E2E8F0'}`,
+                                  borderRadius: 10,
+                                  padding: '7px 10px',
                                   display: 'flex',
                                   alignItems: 'center',
                                   justifyContent: 'space-between',
@@ -512,19 +516,19 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                               >
                                 <span
                                   style={{
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    color: isDark ? D.textPrimary : '#1a1a2e',
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: isDark ? D.textPrimary : '#1e293b',
                                   }}
                                 >
                                   {dim.name}
                                 </span>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'monospace' }}>
-                                  <span style={{ fontSize: 11.5, fontWeight: 600, color: isDark ? D.textMuted : '#94A3B8' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontFamily: 'monospace' }}>
+                                  <span style={{ fontSize: 10.5, fontWeight: 500, color: isDark ? D.textMuted : '#94A3B8' }}>
                                     {dim.before}
                                   </span>
-                                  <span style={{ fontSize: 11, color: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1' }}>→</span>
-                                  <span style={{ fontSize: 12, fontWeight: 800, color: '#10b981' }}>
+                                  <span style={{ fontSize: 10, color: isDark ? 'rgba(255,255,255,0.2)' : '#CBD5E1' }}>→</span>
+                                  <span style={{ fontSize: 11, fontWeight: 700, color: '#10b981' }}>
                                     {dim.after}
                                   </span>
                                 </div>

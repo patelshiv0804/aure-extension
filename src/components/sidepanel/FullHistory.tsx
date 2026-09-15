@@ -306,10 +306,14 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                             {modeConfig.label}
                           </span>
                         )}
-                        <span className="text-[11px] font-medium" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
-                          {prompt.platform}
-                        </span>
-                        <span className="text-[10px]" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#C4C4D4' }}>•</span>
+                        {prompt.platform && prompt.platform.toLowerCase() !== 'promptiq' && (
+                          <>
+                            <span className="text-[11px] font-medium" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
+                              {prompt.platform}
+                            </span>
+                            <span className="text-[10px]" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#C4C4D4' }}>•</span>
+                          </>
+                        )}
                         <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
                           {new Date(prompt.createdAt).toLocaleDateString()}
                         </span>

@@ -159,11 +159,6 @@ export const SidePanelRoot: React.FC = () => {
               : '0 16px 40px rgba(124, 92, 252, 0.08)',
           }}
         >
-          {/* Header Theme Toggle for quick access even on unsupported sites */}
-          <div className="w-full flex justify-end">
-            <ThemeToggle />
-          </div>
-
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-inner"
             style={{
