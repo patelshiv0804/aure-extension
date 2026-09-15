@@ -10,6 +10,8 @@ import { useEnhanceStore } from '@/stores/enhance.store';
 import { analyzePrompt, calculateImprovements } from '@/lib/analytics';
 import { formatPromptText } from '@/lib/formatter';
 import { RoleIcon } from '../common/RoleIcon';
+import { useTheme } from '@/hooks/useTheme';
+import { D, L } from '@/theme/tokens';
 
 interface ComparisonPanelProps {
   adapter: SiteAdapter;
@@ -21,6 +23,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   onAccept,
   onReject,
 }) => {
+  const { isDark } = useTheme();
   const { enhanceResult, recommendation, setShowRecommendation } = useEnhanceStore();
   const [editedText, setEditedText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
@@ -77,17 +80,20 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
           className="overflow-hidden w-[800px] max-w-[90vw] max-h-[85vh] flex flex-col"
           style={{
             fontFamily: "'Inter', system-ui, sans-serif",
-            background: '#FFFFFF',
+            background: isDark ? D.surface : '#FFFFFF',
             borderRadius: 20,
-            border: '1px solid #ECE9FF',
-            boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.15)',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.1)' : '1px solid #ECE9FF',
+            boxShadow: isDark ? '0 24px 48px -12px rgba(0, 0, 0, 0.6)' : '0 24px 48px -12px rgba(0, 0, 0, 0.15)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
           <div
             className="px-6 py-4 flex items-center justify-between"
-            style={{ borderBottom: '1px solid #ECE9FF', background: 'linear-gradient(135deg, #FAFAFE, #F5F3FF)' }}
+            style={{
+              borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+              background: isDark ? D.surfaceElevated : 'linear-gradient(135deg, #FAFAFE, #F5F3FF)',
+            }}
           >
             <div className="flex items-center gap-3">
               <div
@@ -97,10 +103,10 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 <RoleIcon name="Sparkles" size={16} strokeWidth={2} />
               </div>
               <div>
-                <h2 className="text-[15px] font-bold" style={{ color: '#1a1a2e', letterSpacing: '-0.02em' }}>
+                <h2 className="text-[15px] font-bold" style={{ color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.02em' }}>
                   Prompt Comparison
                 </h2>
-                <p className="text-[12px]" style={{ color: '#8E8EA0' }}>
+                <p className="text-[12px]" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>
                   Review the enhancement before applying
                 </p>
               </div>
@@ -108,29 +114,38 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
             <button
               onClick={onReject}
               className="w-8 h-8 flex items-center justify-center rounded-xl transition-all duration-200"
-              style={{ color: '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8E8EA0'; }}
+              style={{ color: isDark ? D.textSecondary : '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
+              onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? D.textSecondary : '#8E8EA0'; }}
             >
               <RoleIcon name="X" size={18} strokeWidth={2} />
             </button>
           </div>
 
           {/* Comparison Area */}
-          <div className="flex-1 overflow-auto p-6 pe-scrollbar" style={{ background: '#FAFAFE' }}>
+          <div className="flex-1 overflow-auto p-6 pe-scrollbar" style={{ background: isDark ? D.bg : '#FAFAFE' }}>
             <div className="grid grid-cols-2 gap-4 mb-5">
               {/* Original */}
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #ECE9FF', background: '#FFFFFF' }}>
-                <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid #ECE9FF' }}>
-                  <span className="text-[12px] font-semibold" style={{ color: '#8E8EA0' }}>Original</span>
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+                  background: isDark ? D.surface : '#FFFFFF',
+                }}
+              >
+                <div
+                  className="px-4 py-2.5 flex items-center justify-between"
+                  style={{ borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF' }}
+                >
+                  <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>Original</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px]" style={{ color: '#c4c4d4' }}>
+                    <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#c4c4d4' }}>
                       {originalAnalytics.wordCount}w · {originalAnalytics.tokenCount}t
                     </span>
                     <button
                       onClick={() => handleCopy(originalPrompt, 'original')}
                       className="flex items-center gap-1 transition-colors duration-150"
-                      style={{ fontSize: 11, color: '#8E8EA0', background: 'none', border: 'none', cursor: 'pointer' }}
+                      style={{ fontSize: 11, color: isDark ? D.textSecondary : '#8E8EA0', background: 'none', border: 'none', cursor: 'pointer' }}
                     >
                       <RoleIcon name={copiedSide === 'original' ? 'Check' : 'Copy'} size={12} />
                       {copiedSide === 'original' ? 'Copied' : 'Copy'}
@@ -138,24 +153,33 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                   </div>
                 </div>
                 <div className="p-4">
-                  <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: '#1a1a2e' }}>
+                  <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
                     {originalPrompt}
                   </p>
                 </div>
               </div>
 
               {/* Enhanced */}
-              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #A78BFA40', background: '#F5F3FF20' }}>
-                <div className="px-4 py-2.5 flex items-center justify-between" style={{ borderBottom: '1px solid #A78BFA30' }}>
-                  <span className="text-[12px] font-semibold" style={{ color: '#7C5CFC' }}>Enhanced</span>
+              <div
+                className="rounded-xl overflow-hidden"
+                style={{
+                  border: isDark ? '1px solid rgba(124, 92, 252, 0.3)' : '1px solid #A78BFA40',
+                  background: isDark ? 'rgba(124, 92, 252, 0.08)' : '#F5F3FF20',
+                }}
+              >
+                <div
+                  className="px-4 py-2.5 flex items-center justify-between"
+                  style={{ borderBottom: isDark ? '1px solid rgba(124, 92, 252, 0.2)' : '1px solid #A78BFA30' }}
+                >
+                  <span className="text-[12px] font-semibold" style={{ color: isDark ? '#A78BFA' : '#7C5CFC' }}>Enhanced</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px]" style={{ color: '#c4c4d4' }}>
+                    <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#c4c4d4' }}>
                       {enhancedAnalytics.wordCount}w · {enhancedAnalytics.tokenCount}t
                     </span>
                     <button
                       onClick={() => handleCopy(enhancedPrompt, 'enhanced')}
                       className="flex items-center gap-1 transition-colors duration-150"
-                      style={{ fontSize: 11, color: '#8E8EA0', background: 'none', border: 'none', cursor: 'pointer' }}
+                      style={{ fontSize: 11, color: isDark ? D.textSecondary : '#8E8EA0', background: 'none', border: 'none', cursor: 'pointer' }}
                     >
                       <RoleIcon name={copiedSide === 'enhanced' ? 'Check' : 'Copy'} size={12} />
                       {copiedSide === 'enhanced' ? 'Copied' : 'Copy'}
@@ -168,11 +192,11 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                       value={editedText}
                       onChange={(e) => setEditedText(e.target.value)}
                       className="w-full bg-transparent text-[13px] resize-none outline-none min-h-[120px] leading-relaxed"
-                      style={{ color: '#1a1a2e' }}
+                      style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}
                       autoFocus
                     />
                   ) : (
-                    <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: '#1a1a2e' }}>
+                    <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
                       {enhancedPrompt}
                     </p>
                   )}
@@ -181,9 +205,15 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
             </div>
 
             {/* Diff View */}
-            <div className="mb-5 rounded-xl overflow-hidden" style={{ border: '1px solid #ECE9FF', background: '#FFFFFF' }}>
-              <div className="px-4 py-2.5" style={{ borderBottom: '1px solid #ECE9FF' }}>
-                <span className="text-[12px] font-semibold" style={{ color: '#8E8EA0' }}>Changes</span>
+            <div
+              className="mb-5 rounded-xl overflow-hidden"
+              style={{
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+                background: isDark ? D.surface : '#FFFFFF',
+              }}
+            >
+              <div className="px-4 py-2.5" style={{ borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF' }}>
+                <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>Changes</span>
               </div>
               <div className="p-4">
                 <div className="text-[13px] leading-relaxed">
@@ -191,8 +221,16 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                     <span
                       key={i}
                       style={{
-                        background: part.added ? 'rgba(52, 211, 153, 0.12)' : part.removed ? 'rgba(239, 68, 68, 0.08)' : 'transparent',
-                        color: part.added ? '#059669' : part.removed ? '#dc2626' : '#1a1a2e',
+                        background: part.added
+                          ? (isDark ? 'rgba(52, 211, 153, 0.2)' : 'rgba(52, 211, 153, 0.12)')
+                          : part.removed
+                          ? (isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.08)')
+                          : 'transparent',
+                        color: part.added
+                          ? (isDark ? '#34D399' : '#059669')
+                          : part.removed
+                          ? (isDark ? '#F87171' : '#dc2626')
+                          : (isDark ? D.textPrimary : '#1a1a2e'),
                         textDecoration: part.removed ? 'line-through' : 'none',
                         padding: part.added || part.removed ? '1px 3px' : 0,
                         borderRadius: 3,
@@ -332,14 +370,17 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 <div
                   className="rounded-2xl p-5 mb-5"
                   style={{
-                    background: '#FFFFFF',
-                    border: '1px solid #ECE9FF',
-                    boxShadow: '0 4px 20px rgba(124, 92, 252, 0.05)',
+                    background: isDark ? D.surface : '#FFFFFF',
+                    border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+                    boxShadow: isDark ? '0 4px 20px rgba(0, 0, 0, 0.4)' : '0 4px 20px rgba(124, 92, 252, 0.05)',
                   }}
                 >
                   <div className="flex flex-col md:flex-row gap-6">
                     {/* Left Column: Overall Ring & Before/After */}
-                    <div className="w-[170px] flex-shrink-0 flex flex-col items-center justify-between border-b md:border-b-0 md:border-r border-[#ECE9FF] pb-4 md:pb-0 md:pr-6">
+                    <div
+                      className="w-[170px] flex-shrink-0 flex flex-col items-center justify-between border-b md:border-b-0 md:border-r pb-4 md:pb-0 md:pr-6"
+                      style={{ borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : '#ECE9FF' }}
+                    >
                       <div className="relative w-28 h-28 flex items-center justify-center mb-2">
                         <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
                           <circle
@@ -347,7 +388,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                             cy="50"
                             r="42"
                             fill="none"
-                            stroke="#F1F5F9"
+                            stroke={isDark ? '#211E30' : '#F1F5F9'}
                             strokeWidth="8"
                           />
                           <circle
@@ -370,7 +411,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                           </defs>
                         </svg>
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <span className="text-3xl font-extrabold text-[#1a1a2e] tracking-tight">
+                          <span className="text-3xl font-extrabold tracking-tight" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
                             {overallAfter}
                           </span>
                         </div>
@@ -380,19 +421,26 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                         {scoreLabelText}
                       </div>
 
-                      <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[#059669] bg-[#ECFDF5] border border-[#A7F3D0] px-2.5 py-0.5 rounded-full mb-3">
+                      <div
+                        className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full mb-3"
+                        style={{
+                          color: '#10B981',
+                          background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                          border: isDark ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid #A7F3D0',
+                        }}
+                      >
                         <RoleIcon name="TrendingUp" size={12} />
                         <span>+{ptsGain} pts</span>
                       </div>
 
                       <div className="w-full space-y-1 text-[12px]">
-                        <div className="flex justify-between items-center text-[#64748B]">
+                        <div className="flex justify-between items-center" style={{ color: isDark ? D.textMuted : '#64748B' }}>
                           <span>Before</span>
-                          <span className="font-semibold text-[#64748B]">{overallBefore}</span>
+                          <span className="font-semibold">{overallBefore}</span>
                         </div>
-                        <div className="flex justify-between items-center text-[#64748B]">
+                        <div className="flex justify-between items-center" style={{ color: isDark ? D.textMuted : '#64748B' }}>
                           <span>After</span>
-                          <span className="font-bold text-[#059669]">{overallAfter}</span>
+                          <span className="font-bold text-[#10B981]">{overallAfter}</span>
                         </div>
                       </div>
                     </div>
@@ -407,8 +455,8 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                             key={dim.id}
                             className="relative rounded-xl p-3.5 flex flex-col justify-between overflow-hidden transition-all duration-150 hover:-translate-y-0.5"
                             style={{
-                              background: 'rgba(124, 92, 252, 0.02)',
-                              border: '1px solid rgba(124, 92, 252, 0.08)',
+                              background: isDark ? 'rgba(255, 255, 255, 0.03)' : 'rgba(124, 92, 252, 0.02)',
+                              border: isDark ? '1px solid rgba(255, 255, 255, 0.06)' : '1px solid rgba(124, 92, 252, 0.08)',
                             }}
                           >
                             {/* Left accent bar */}
@@ -425,23 +473,23 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                               {/* Header row */}
                               <div className="flex items-center justify-between gap-1.5 mb-1.5">
                                 <div className="flex items-center gap-1.5 min-w-0">
-                                  <span style={{ color: isGood ? '#10B981' : isWarning ? '#7C5CFC' : '#94A3B8' }}>
+                                  <span style={{ color: isGood ? '#10B981' : isWarning ? '#7C5CFC' : (isDark ? D.textMuted : '#94A3B8') }}>
                                     <RoleIcon
                                       name={isGood ? 'CheckCircle' : isWarning ? 'AlertTriangle' : 'Minus'}
                                       size={14}
                                       strokeWidth={2}
                                     />
                                   </span>
-                                  <span className="text-[13px] font-semibold text-[#1a1a2e] truncate">
+                                  <span className="text-[13px] font-semibold truncate" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
                                     {dim.label}
                                   </span>
                                 </div>
                                 <div className="text-[11px] font-semibold flex items-center gap-1 flex-shrink-0">
-                                  <span className="text-[#94A3B8]">{dim.scoreBefore}</span>
-                                  <span className="text-[#CBD5E1] text-[9px]">→</span>
+                                  <span style={{ color: isDark ? D.textMuted : '#94A3B8' }}>{dim.scoreBefore}</span>
+                                  <span style={{ color: isDark ? D.border : '#CBD5E1' }} className="text-[9px]">→</span>
                                   <span
                                     className="font-bold"
-                                    style={{ color: isGood ? '#059669' : '#7C5CFC' }}
+                                    style={{ color: isGood ? '#10B981' : '#7C5CFC' }}
                                   >
                                     {dim.scoreAfter}
                                   </span>
@@ -449,7 +497,10 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                               </div>
 
                               {/* Progress bar */}
-                              <div className="h-[3px] w-full bg-[#ECE9FF] rounded-full overflow-hidden mb-2">
+                              <div
+                                className="h-[3px] w-full rounded-full overflow-hidden mb-2"
+                                style={{ background: isDark ? '#211E30' : '#ECE9FF' }}
+                              >
                                 <div
                                   className="h-full rounded-full transition-all duration-500"
                                   style={{
@@ -460,7 +511,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                               </div>
 
                               {/* Description */}
-                              <p className="text-[11px] text-[#64748B] leading-tight m-0">
+                              <p className="text-[11px] leading-tight m-0" style={{ color: isDark ? D.textMuted : '#64748B' }}>
                                 {dim.desc}
                               </p>
                             </div>
@@ -477,15 +528,18 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
           {/* Action Bar */}
           <div
             className="px-6 py-4 flex items-center justify-between"
-            style={{ borderTop: '1px solid #ECE9FF', background: '#FFFFFF' }}
+            style={{
+              borderTop: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+              background: isDark ? D.surface : '#FFFFFF',
+            }}
           >
             <div className="flex gap-2">
               <button
                 onClick={handleEdit}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
-                style={{ fontSize: 13, fontWeight: 500, color: '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8E8EA0'; }}
+                style={{ fontSize: 13, fontWeight: 500, color: isDark ? D.textSecondary : '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? D.textSecondary : '#8E8EA0'; }}
               >
                 <RoleIcon name="Pencil" size={14} />
                 {isEditing ? 'Preview' : 'Edit'}
@@ -494,9 +548,9 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 <button
                   onClick={() => setShowRecommendation(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
-                  style={{ fontSize: 13, fontWeight: 500, color: '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8E8EA0'; }}
+                  style={{ fontSize: 13, fontWeight: 500, color: isDark ? D.textSecondary : '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? D.textSecondary : '#8E8EA0'; }}
                 >
                   <RoleIcon name="Bot" size={14} />
                   AI Recommendation
@@ -508,11 +562,13 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 onClick={onReject}
                 className="px-5 py-2.5 rounded-xl transition-all duration-200"
                 style={{
-                  fontSize: 13, fontWeight: 500, color: '#8E8EA0',
-                  background: 'transparent', border: '1px solid #ECE9FF', cursor: 'pointer',
+                  fontSize: 13, fontWeight: 500, color: isDark ? D.textSecondary : '#8E8EA0',
+                  background: 'transparent',
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #ECE9FF',
+                  cursor: 'pointer',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#F5F3FF'; e.currentTarget.style.borderColor = '#A78BFA'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = '#ECE9FF'; }}
+                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.borderColor = '#A78BFA'; }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#ECE9FF'; }}
               >
                 Discard
               </button>

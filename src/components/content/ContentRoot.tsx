@@ -19,6 +19,7 @@ import { EnhancementModePanel } from './EnhancementModePanel';
 import { ComparisonPanel } from './ComparisonPanel';
 import { ModelRecommendation } from './ModelRecommendation';
 import { EnhancedBadge, type PromptVersionItem } from './EnhancedBadge';
+import { useTheme } from '@/hooks/useTheme';
 
 interface ContentRootProps {
   adapter: SiteAdapter;
@@ -45,6 +46,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   } = useEnhanceStore();
 
   const { loadSettings } = useSettingsStore();
+  const { isDark } = useTheme();
 
   // Load settings on mount
   useEffect(() => {

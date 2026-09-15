@@ -52,7 +52,7 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     defaultMode: 'creator',
   },
   ui: {
-    theme: 'light',
+    theme: 'system',
     animationsEnabled: true,
     floatingIconPosition: 'bottom-right',
     compactMode: false,

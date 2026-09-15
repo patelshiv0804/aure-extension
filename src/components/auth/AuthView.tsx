@@ -10,11 +10,14 @@ import {
 } from 'lucide-react';
 import { useAuthStore } from '@/stores/auth.store';
 import { getStorage } from '@/lib/storage';
+import { useTheme } from '@/hooks/useTheme';
+import { D, L } from '@/theme/tokens';
 
 type AuthMode = 'signin' | 'signup' | 'forgot-email' | 'forgot-otp' | 'forgot-reset' | 'forgot-success';
 const OTP_LENGTH = 6;
 
 export const AuthView: React.FC = () => {
+  const { isDark } = useTheme();
   const {
     user,
     isAuthenticated,
@@ -259,7 +262,14 @@ export const AuthView: React.FC = () => {
     const initials = (user.display_name || user.email).slice(0, 2).toUpperCase();
 
     return (
-      <div className="w-full max-w-md mx-auto rounded-2xl bg-white border border-slate-200/80 shadow-lg overflow-hidden">
+      <div
+        className="w-full max-w-md mx-auto rounded-2xl shadow-lg overflow-hidden transition-colors"
+        style={{
+          background: isDark ? D.surface : '#FFFFFF',
+          border: `1px solid ${isDark ? D.border : 'rgba(226, 232, 240, 0.8)'}`,
+          color: isDark ? D.textPrimary : '#0F172A',
+        }}
+      >
         {/* Top gradient bar */}
         <div className="h-1.5 w-full bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400" />
         <div className="p-6 space-y-6">
@@ -273,25 +283,44 @@ export const AuthView: React.FC = () => {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">
+                <h3 className="text-base font-bold" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
                   {user.display_name || 'PromptIQ User'}
                 </h3>
-                <span className="px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase bg-purple-50 text-purple-700 border border-purple-200/60 rounded-full">
+                <span
+                  className="px-2 py-0.5 text-[10px] font-bold tracking-wide uppercase rounded-full"
+                  style={{
+                    background: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F3E8FF',
+                    color: isDark ? '#C084FC' : '#7E22CE',
+                    border: `1px solid ${isDark ? 'rgba(139, 92, 246, 0.3)' : 'rgba(216, 180, 254, 0.6)'}`,
+                  }}
+                >
                   {user.plan || 'Pro'}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">{user.email}</p>
+              <p className="text-xs mt-0.5" style={{ color: isDark ? D.textSecondary : '#64748B' }}>{user.email}</p>
             </div>
           </div>
 
-          <div className="space-y-2.5 pt-3 border-t border-slate-100">
-            <div className="flex justify-between items-center text-xs py-2 px-3 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-slate-500 font-medium">Account ID</span>
-              <span className="font-mono text-slate-700 font-semibold">{user.id.slice(0, 8)}...</span>
+          <div className="space-y-2.5 pt-3" style={{ borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'}` }}>
+            <div
+              className="flex justify-between items-center text-xs py-2 px-3 rounded-xl"
+              style={{
+                background: isDark ? D.surface2 : '#F8FAFC',
+                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'}`,
+              }}
+            >
+              <span style={{ color: isDark ? D.textSecondary : '#64748B' }} className="font-medium">Account ID</span>
+              <span className="font-mono font-semibold" style={{ color: isDark ? D.textPrimary : '#334155' }}>{user.id.slice(0, 8)}...</span>
             </div>
-            <div className="flex justify-between items-center text-xs py-2 px-3 rounded-xl bg-slate-50 border border-slate-100">
-              <span className="text-slate-500 font-medium">Session Status</span>
-              <span className="flex items-center gap-1.5 text-emerald-600 font-semibold">
+            <div
+              className="flex justify-between items-center text-xs py-2 px-3 rounded-xl"
+              style={{
+                background: isDark ? D.surface2 : '#F8FAFC',
+                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9'}`,
+              }}
+            >
+              <span style={{ color: isDark ? D.textSecondary : '#64748B' }} className="font-medium">Session Status</span>
+              <span className="flex items-center gap-1.5 text-emerald-500 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                 Session Active
               </span>
@@ -337,14 +366,24 @@ export const AuthView: React.FC = () => {
   // ── Auth Views (Sign In, Sign Up, Forgot Password) ────────
 
   return (
-    <div className="w-full max-w-md mx-auto rounded-2xl bg-white border border-slate-200/80 shadow-xl overflow-hidden font-sans">
+    <div
+      className="w-full max-w-md mx-auto rounded-2xl shadow-xl overflow-hidden font-sans transition-colors"
+      style={{
+        background: isDark ? D.surface : '#FFFFFF',
+        border: `1px solid ${isDark ? D.border : 'rgba(226, 232, 240, 0.8)'}`,
+        color: isDark ? D.textPrimary : '#0F172A',
+      }}
+    >
       {/* Top subtle gradient accent bar matching frontend */}
       <div className="h-1.5 w-full bg-gradient-to-r from-purple-400 via-pink-400 to-indigo-400" />
 
       <div className="p-6 sm:p-7 space-y-6">
         {/* Title & Subtitle */}
         <div className="text-center">
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight mb-1">
+          <h2
+            className="text-xl font-bold tracking-tight mb-1"
+            style={{ color: isDark ? D.textPrimary : '#0F172A' }}
+          >
             {mode === 'signin' && 'Welcome back'}
             {mode === 'signup' && 'Create Account'}
             {mode === 'forgot-email' && 'Forgot Password?'}
@@ -352,7 +391,7 @@ export const AuthView: React.FC = () => {
             {mode === 'forgot-reset' && 'Set new password'}
             {mode === 'forgot-success' && 'Password Reset!'}
           </h2>
-          <p className="text-xs text-slate-500 font-medium">
+          <p className="text-xs font-medium" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
             {mode === 'signin' && 'Sign in to continue to PromptIQ'}
             {mode === 'signup' && 'Register your PromptIQ developer profile'}
             {mode === 'forgot-email' && 'Enter your email to receive a 6-digit reset code'}
@@ -364,26 +403,42 @@ export const AuthView: React.FC = () => {
 
         {/* Tab Buttons (Sign In / Create Account) */}
         {(mode === 'signin' || mode === 'signup') && (
-          <div className="flex border-b border-slate-100">
+          <div style={{ display: 'flex', borderBottom: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.09)' : '#ECE9FF'}` }}>
             <button
               type="button"
               onClick={() => { setMode('signin'); setFormError(null); clearError(); }}
-              className={`flex-1 pb-3 text-xs text-center transition-all cursor-pointer ${
-                mode === 'signin'
-                  ? 'border-b-2 border-purple-600 text-slate-900 font-bold'
-                  : 'text-slate-400 font-medium hover:text-slate-600'
-              }`}
+              style={{
+                flex: 1,
+                paddingBottom: 12,
+                fontSize: 13,
+                textAlign: 'center',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: mode === 'signin' ? '2px solid #8B5CF6' : '2px solid transparent',
+                color: mode === 'signin' ? (isDark ? D.textPrimary : '#0F172A') : (isDark ? D.textMuted : '#94A3B8'),
+                fontWeight: mode === 'signin' ? 700 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
             >
               Sign In
             </button>
             <button
               type="button"
               onClick={() => { setMode('signup'); setFormError(null); clearError(); }}
-              className={`flex-1 pb-3 text-xs text-center transition-all cursor-pointer ${
-                mode === 'signup'
-                  ? 'border-b-2 border-purple-600 text-slate-900 font-bold'
-                  : 'text-slate-400 font-medium hover:text-slate-600'
-              }`}
+              style={{
+                flex: 1,
+                paddingBottom: 12,
+                fontSize: 13,
+                textAlign: 'center',
+                background: 'transparent',
+                border: 'none',
+                borderBottom: mode === 'signup' ? '2px solid #8B5CF6' : '2px solid transparent',
+                color: mode === 'signup' ? (isDark ? D.textPrimary : '#0F172A') : (isDark ? D.textMuted : '#94A3B8'),
+                fontWeight: mode === 'signup' ? 700 : 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
             >
               Create Account
             </button>
@@ -392,7 +447,14 @@ export const AuthView: React.FC = () => {
 
         {/* Error Alert Box */}
         {formError && (
-          <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-xs text-rose-600 font-medium flex items-center gap-2">
+          <div
+            className="p-3 rounded-xl text-xs font-medium flex items-center gap-2"
+            style={{
+              background: isDark ? 'rgba(239, 68, 68, 0.12)' : '#FEF2F2',
+              border: `1px solid ${isDark ? 'rgba(239, 68, 68, 0.25)' : '#FECACA'}`,
+              color: isDark ? '#F87171' : '#DC2626',
+            }}
+          >
             <span>⚠️</span>
             <span className="flex-1">{formError}</span>
           </div>
@@ -402,15 +464,29 @@ export const AuthView: React.FC = () => {
         {mode === 'signin' && (
           <form onSubmit={handleSignIn} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Email address</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Email address</label>
               <div className="relative flex items-center">
-                <Mail size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Mail size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
@@ -419,41 +495,75 @@ export const AuthView: React.FC = () => {
 
             <div>
               <div className="flex justify-between items-center mb-1.5 ml-1">
-                <label className="text-xs font-semibold text-slate-900">Password</label>
+                <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="text-xs font-semibold">Password</label>
                 <button
                   type="button"
                   onClick={() => { setMode('forgot-email'); setFormError(null); }}
-                  className="text-[11px] font-bold text-purple-600 hover:text-purple-700 transition-colors"
+                  style={{ color: isDark ? '#A78BFA' : '#7C3AED', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                  className="text-[11px] font-bold hover:underline transition-colors"
                 >
                   Forgot?
                 </button>
               </div>
               <div className="relative flex items-center">
-                <Lock size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Lock size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 40,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-700 transition-colors"
+                  style={{ position: 'absolute', right: 14, color: isDark ? D.textMuted : '#94A3B8', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                  className="hover:opacity-80 transition-opacity"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
             </div>
 
-            {/* Dark Submit Button */}
+            {/* High-contrast Pill Submit Button */}
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 rounded-full text-xs font-semibold text-white bg-[#111827] hover:bg-slate-800 active:scale-[0.99] shadow-md shadow-slate-900/10 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                background: isDark ? D.ctaBg : '#111827',
+                color: isDark ? D.ctaText : '#FFFFFF',
+                boxShadow: isDark ? D.ctaShadow : '0 4px 14px rgba(0, 0, 0, 0.12)',
+                border: 'none',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+                opacity: submitting ? 0.75 : 1,
+              }}
             >
               {submitting ? 'Signing In...' : 'Sign In'}
               <ArrowRight size={15} />
@@ -461,16 +571,32 @@ export const AuthView: React.FC = () => {
 
             {/* OAuth Divider */}
             <div className="flex items-center gap-3 my-4">
-              <div className="flex-1 h-px bg-slate-200/80" />
-              <span className="text-[10px] font-bold tracking-wider text-slate-400 uppercase">OR CONTINUE WITH</span>
-              <div className="flex-1 h-px bg-slate-200/80" />
+              <div className="flex-1 h-px" style={{ background: isDark ? 'rgba(255, 255, 255, 0.09)' : '#E2E8F0' }} />
+              <span className="text-[10px] font-bold tracking-wider uppercase" style={{ color: isDark ? D.textMuted : '#94A3B8' }}>OR CONTINUE WITH</span>
+              <div className="flex-1 h-px" style={{ background: isDark ? 'rgba(255, 255, 255, 0.09)' : '#E2E8F0' }} />
             </div>
 
             {/* Google Sign In Button */}
             <button
               type="button"
               onClick={handleGoogleSignInClick}
-              className="w-full py-2.5 px-4 rounded-full text-xs font-semibold text-slate-800 bg-white border border-slate-200 hover:bg-slate-50 transition-all flex items-center justify-center gap-2.5 shadow-xs cursor-pointer"
+              style={{
+                width: '100%',
+                padding: '11px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 600,
+                background: isDark ? D.surface2 : '#FFFFFF',
+                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                color: isDark ? D.textPrimary : '#1E293B',
+                boxShadow: isDark ? '0 2px 8px rgba(0, 0, 0, 0.4)' : '0 1px 2px rgba(17, 24, 39, 0.04)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 10,
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+              }}
             >
               <svg width="18" height="18" viewBox="0 0 48 48">
                 <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.221 36 24 36c-6.627 0-12-5.373-12-12S17.373 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.278 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917Z"/>
@@ -482,12 +608,27 @@ export const AuthView: React.FC = () => {
             </button>
 
             {/* Footer Prompt */}
-            <div className="pt-3 border-t border-slate-100 text-center text-xs text-slate-600">
+            <div
+              style={{
+                paddingTop: 14,
+                borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.09)' : '#F1F5F9'}`,
+                color: isDark ? D.textSecondary : '#64748B',
+              }}
+              className="text-center text-xs"
+            >
               Don&apos;t have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setMode('signup'); setFormError(null); }}
-                className="font-bold text-slate-900 hover:text-purple-600 transition-colors"
+                style={{
+                  fontWeight: 700,
+                  color: isDark ? '#A78BFA' : '#7C3AED',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+                className="hover:underline transition-colors"
               >
                 Get Started
               </button>
@@ -499,15 +640,29 @@ export const AuthView: React.FC = () => {
         {mode === 'signup' && (
           <form onSubmit={handleSignUp} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Full Name</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Full Name</label>
               <div className="relative flex items-center">
-                <User size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <User size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="text"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="John Doe"
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
@@ -515,15 +670,29 @@ export const AuthView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Email address</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Email address</label>
               <div className="relative flex items-center">
-                <Mail size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Mail size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
@@ -531,22 +700,37 @@ export const AuthView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Password</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Password</label>
               <div className="relative flex items-center">
-                <Lock size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Lock size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 40,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-700 transition-colors"
+                  style={{ position: 'absolute', right: 14, color: isDark ? D.textMuted : '#94A3B8', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                  className="hover:opacity-80 transition-opacity"
                 >
                   {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -554,38 +738,85 @@ export const AuthView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Confirm Password</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Confirm Password</label>
               <div className="relative flex items-center">
-                <Lock size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Lock size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
               </div>
             </div>
 
-            {/* Dark Submit Button */}
+            {/* High-contrast Pill Submit Button */}
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 rounded-full text-xs font-semibold text-white bg-[#111827] hover:bg-slate-800 active:scale-[0.99] shadow-md shadow-slate-900/10 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                background: isDark ? D.ctaBg : '#111827',
+                color: isDark ? D.ctaText : '#FFFFFF',
+                boxShadow: isDark ? D.ctaShadow : '0 4px 14px rgba(0, 0, 0, 0.12)',
+                border: 'none',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+                opacity: submitting ? 0.75 : 1,
+              }}
             >
               {submitting ? 'Creating Account...' : 'Create Account'}
               <ArrowRight size={15} />
             </button>
 
             {/* Footer Prompt */}
-            <div className="pt-3 border-t border-slate-100 text-center text-xs text-slate-600">
+            <div
+              style={{
+                paddingTop: 14,
+                borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.09)' : '#F1F5F9'}`,
+                color: isDark ? D.textSecondary : '#64748B',
+              }}
+              className="text-center text-xs"
+            >
               Already have an account?{' '}
               <button
                 type="button"
                 onClick={() => { setMode('signin'); setFormError(null); }}
-                className="font-bold text-slate-900 hover:text-purple-600 transition-colors"
+                style={{
+                  fontWeight: 700,
+                  color: isDark ? '#A78BFA' : '#7C3AED',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                }}
+                className="hover:underline transition-colors"
               >
                 Sign In
               </button>
@@ -599,25 +830,59 @@ export const AuthView: React.FC = () => {
             <button
               type="button"
               onClick={() => { setMode('signin'); setFormError(null); }}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-purple-600 transition-colors mb-1"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: isDark ? D.textSecondary : '#64748B',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                marginBottom: 6,
+              }}
+              className="hover:opacity-80 transition-opacity"
             >
               <ArrowLeft size={14} /> Back to Sign In
             </button>
 
-            <div className="w-12 h-12 rounded-full bg-purple-50 border border-purple-200/60 flex items-center justify-center mx-auto text-purple-600">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center mx-auto"
+              style={{
+                background: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F3E8FF',
+                border: `1px solid ${isDark ? 'rgba(139, 92, 246, 0.3)' : '#DDD6FE'}`,
+                color: isDark ? '#C084FC' : '#7C3AED',
+              }}
+            >
               <KeyRound size={22} />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Email address</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Email address</label>
               <div className="relative flex items-center">
-                <Mail size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Mail size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="name@company.com"
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium placeholder:text-slate-400"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
@@ -627,7 +892,25 @@ export const AuthView: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 rounded-full text-xs font-semibold text-white bg-[#111827] hover:bg-slate-800 active:scale-[0.99] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                background: isDark ? D.ctaBg : '#111827',
+                color: isDark ? D.ctaText : '#FFFFFF',
+                boxShadow: isDark ? D.ctaShadow : '0 4px 14px rgba(0, 0, 0, 0.12)',
+                border: 'none',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+                opacity: submitting ? 0.75 : 1,
+              }}
             >
               {submitting ? 'Sending Code...' : 'Send Reset Code'}
               <ArrowRight size={15} />
@@ -641,12 +924,32 @@ export const AuthView: React.FC = () => {
             <button
               type="button"
               onClick={() => { setMode('forgot-email'); setFormError(null); }}
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-purple-600 transition-colors mb-1"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontSize: 12,
+                fontWeight: 600,
+                color: isDark ? D.textSecondary : '#64748B',
+                background: 'transparent',
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                marginBottom: 6,
+              }}
+              className="hover:opacity-80 transition-opacity"
             >
               <ArrowLeft size={14} /> Change email
             </button>
 
-            <div className="w-12 h-12 rounded-full bg-purple-50 border border-purple-200/60 flex items-center justify-center mx-auto text-purple-600">
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center mx-auto"
+              style={{
+                background: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F3E8FF',
+                border: `1px solid ${isDark ? 'rgba(139, 92, 246, 0.3)' : '#DDD6FE'}`,
+                color: isDark ? '#C084FC' : '#7C3AED',
+              }}
+            >
               <Mail size={22} />
             </div>
 
@@ -664,18 +967,29 @@ export const AuthView: React.FC = () => {
                   onKeyDown={e => handleOtpKeyDown(i, e)}
                   onPaste={i === 0 ? handleOtpPaste : undefined}
                   disabled={submitting}
-                  className={`w-10 h-12 text-center text-lg font-bold font-mono rounded-xl border transition-all outline-none ${
-                    digit
-                      ? 'border-purple-500 bg-purple-50/50 text-slate-900 shadow-xs'
-                      : 'border-slate-200 bg-slate-50/50 text-slate-900 focus:border-purple-500 focus:bg-white'
-                  }`}
+                  style={{
+                    width: 40,
+                    height: 48,
+                    textAlign: 'center',
+                    fontSize: 18,
+                    fontWeight: 700,
+                    fontFamily: 'monospace',
+                    borderRadius: 12,
+                    background: digit
+                      ? (isDark ? 'rgba(139, 92, 246, 0.2)' : '#F3E8FF')
+                      : (isDark ? D.surface2 : '#F8FAFC'),
+                    border: `1px solid ${digit ? '#8B5CF6' : (isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0')}`,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                 />
               ))}
             </div>
 
-            <div className="text-center text-xs text-slate-500">
+            <div className="text-center text-xs" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
               {otpTimer > 0 ? (
-                <>Code expires in <span className="font-bold text-purple-600">{formatTimer(otpTimer)}</span></>
+                <>Code expires in <span className="font-bold" style={{ color: isDark ? '#A78BFA' : '#7C3AED' }}>{formatTimer(otpTimer)}</span></>
               ) : (
                 <span className="text-rose-500 font-semibold">Code expired</span>
               )}
@@ -684,7 +998,25 @@ export const AuthView: React.FC = () => {
             <button
               type="submit"
               disabled={submitting || fpOtp.join('').length < OTP_LENGTH}
-              className="w-full py-3 px-4 rounded-full text-xs font-semibold text-white bg-[#111827] hover:bg-slate-800 active:scale-[0.99] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                background: isDark ? D.ctaBg : '#111827',
+                color: isDark ? D.ctaText : '#FFFFFF',
+                boxShadow: isDark ? D.ctaShadow : '0 4px 14px rgba(0, 0, 0, 0.12)',
+                border: 'none',
+                cursor: (submitting || fpOtp.join('').length < OTP_LENGTH) ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+                opacity: (submitting || fpOtp.join('').length < OTP_LENGTH) ? 0.6 : 1,
+              }}
             >
               {submitting ? 'Verifying...' : 'Verify Code'}
               <ArrowRight size={15} />
@@ -696,12 +1028,19 @@ export const AuthView: React.FC = () => {
                   type="button"
                   onClick={handleResendOtp}
                   disabled={submitting}
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-purple-600 hover:text-purple-700 transition-colors"
+                  style={{
+                    color: isDark ? '#A78BFA' : '#7C3AED',
+                    background: 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    padding: 0,
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold hover:underline transition-colors"
                 >
                   <RefreshCw size={13} /> Resend code
                 </button>
               ) : (
-                <span className="text-[11px] text-slate-400">Resend code available when timer expires</span>
+                <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#94A3B8' }}>Resend code available when timer expires</span>
               )}
             </div>
           </form>
@@ -711,22 +1050,37 @@ export const AuthView: React.FC = () => {
         {mode === 'forgot-reset' && (
           <form onSubmit={handleResetPassword} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">New Password</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">New Password</label>
               <div className="relative flex items-center">
-                <Lock size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Lock size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type={fpShowPass ? 'text' : 'password'}
                   value={fpNewPass}
                   onChange={(e) => setFpNewPass(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-10 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 40,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
                 <button
                   type="button"
                   onClick={() => setFpShowPass(!fpShowPass)}
-                  className="absolute right-3.5 text-slate-400 hover:text-slate-700 transition-colors"
+                  style={{ position: 'absolute', right: 14, color: isDark ? D.textMuted : '#94A3B8', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                  className="hover:opacity-80 transition-opacity"
                 >
                   {fpShowPass ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
@@ -734,21 +1088,35 @@ export const AuthView: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-900 mb-1.5 ml-1">Confirm Password</label>
+              <label style={{ color: isDark ? D.textPrimary : '#0F172A' }} className="block text-xs font-semibold mb-1.5 ml-1">Confirm Password</label>
               <div className="relative flex items-center">
-                <Lock size={16} className="absolute left-3.5 text-slate-400 pointer-events-none" />
+                <Lock size={16} style={{ position: 'absolute', left: 14, color: isDark ? D.textMuted : '#94A3B8', pointerEvents: 'none' }} />
                 <input
                   type="password"
                   value={fpConfirmPass}
                   onChange={(e) => setFpConfirmPass(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all font-medium"
+                  style={{
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    paddingLeft: 40,
+                    paddingRight: 14,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    fontSize: 13,
+                    background: isDark ? D.surface2 : '#FFFFFF',
+                    border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'}`,
+                    borderRadius: 12,
+                    color: isDark ? D.textPrimary : '#0F172A',
+                    outline: 'none',
+                    transition: 'all 0.2s',
+                  }}
                   required
                   disabled={submitting}
                 />
               </div>
               {fpConfirmPass.length > 0 && (
-                <p className={`text-[11px] mt-1 ml-1 font-semibold ${fpNewPass === fpConfirmPass ? 'text-emerald-600' : 'text-rose-600'}`}>
+                <p className={`text-[11px] mt-1 ml-1 font-semibold ${fpNewPass === fpConfirmPass ? 'text-emerald-500' : 'text-rose-500'}`}>
                   {fpNewPass === fpConfirmPass ? '✓ Passwords match' : '✗ Passwords do not match'}
                 </p>
               )}
@@ -757,7 +1125,25 @@ export const AuthView: React.FC = () => {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full py-3 px-4 rounded-full text-xs font-semibold text-white bg-[#111827] hover:bg-slate-800 active:scale-[0.99] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                background: isDark ? D.ctaBg : '#111827',
+                color: isDark ? D.ctaText : '#FFFFFF',
+                boxShadow: isDark ? D.ctaShadow : '0 4px 14px rgba(0, 0, 0, 0.12)',
+                border: 'none',
+                cursor: submitting ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+                opacity: submitting ? 0.75 : 1,
+              }}
             >
               {submitting ? 'Resetting Password...' : 'Reset Password'}
               <ArrowRight size={15} />
@@ -768,17 +1154,41 @@ export const AuthView: React.FC = () => {
         {/* ── Forgot Password: Success Step ──────────────────── */}
         {mode === 'forgot-success' && (
           <div className="text-center py-4 space-y-4">
-            <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-500 flex items-center justify-center mx-auto border border-emerald-200">
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
+              style={{
+                background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.3)' : '#A7F3D0'}`,
+                color: '#10B981',
+              }}
+            >
               <CheckCircle size={32} />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Password Reset Complete!</h3>
-              <p className="text-xs text-slate-500 mt-1">Your password has been updated. You can now sign in with your new password.</p>
+              <h3 className="text-base font-bold" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>Password Reset Complete!</h3>
+              <p className="text-xs mt-1" style={{ color: isDark ? D.textSecondary : '#64748B' }}>Your password has been updated. You can now sign in with your new password.</p>
             </div>
             <button
               type="button"
               onClick={() => { setMode('signin'); setFormError(null); }}
-              className="w-full py-3 px-4 rounded-full text-xs font-semibold text-white bg-[#111827] hover:bg-slate-800 active:scale-[0.99] shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                borderRadius: 9999,
+                fontSize: 13,
+                fontWeight: 700,
+                letterSpacing: '-0.01em',
+                background: isDark ? D.ctaBg : '#111827',
+                color: isDark ? D.ctaText : '#FFFFFF',
+                boxShadow: isDark ? D.ctaShadow : '0 4px 14px rgba(0, 0, 0, 0.12)',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                transition: 'all 0.2s',
+              }}
             >
               Back to Sign In
               <ArrowRight size={15} />

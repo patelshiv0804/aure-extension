@@ -3,14 +3,42 @@
 @tailwind utilities;
 
 :root {
-  --aure-primary: #7C5CFC;
-  --aure-secondary: #A78BFA;
+  --background: #FAFAFE;
+  --foreground: #0F172A;
+  --aure-primary: #7C3AED;
+  --aure-secondary: #8B5CF6;
   --aure-bg: #FAFAFE;
   --aure-surface: #FFFFFF;
+  --aure-surface-elevated: #FFFFFF;
+  --aure-surface2: #F8FAFC;
   --aure-border: #ECE9FF;
+  --aure-border-strong: rgba(124, 58, 237, 0.25);
   --aure-hover: #F5F3FF;
-  --aure-text: #1a1a2e;
-  --aure-muted: #8E8EA0;
+  --aure-text: #0F172A;
+  --aure-text-secondary: #64748B;
+  --aure-muted: #94A3B8;
+  --aure-success: #10B981;
+  --aure-warning: #F59E0B;
+}
+
+html.dark,
+.dark {
+  --background: #0A0A0F;
+  --foreground: #F5F4F8;
+  --aure-primary: #8B5CF6;
+  --aure-secondary: #A78BFA;
+  --aure-bg: #0A0A0F;
+  --aure-surface: #141320;
+  --aure-surface-elevated: #1A1827;
+  --aure-surface2: #211E30;
+  --aure-border: rgba(255, 255, 255, 0.09);
+  --aure-border-strong: rgba(167, 139, 250, 0.20);
+  --aure-hover: rgba(139, 92, 246, 0.15);
+  --aure-text: #F5F4F8;
+  --aure-text-secondary: #ABA9BC;
+  --aure-muted: #77748A;
+  --aure-success: #34D399;
+  --aure-warning: #F59E0B;
 }
 
 /* ── Prevent text carets and unwanted text selection across UI ── */
@@ -34,6 +62,13 @@ html, body, #root {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   cursor: default;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+html.dark,
+html.dark body {
+  background-color: #0A0A0F !important;
+  color: #F5F4F8;
 }
 
 /* Allow text selection and native blinking carets ONLY on editable fields and intentional selectable containers */
@@ -75,3 +110,9 @@ summary {
   background: rgba(124, 92, 252, 0.22);
 }
 
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.25);
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.45);
+}

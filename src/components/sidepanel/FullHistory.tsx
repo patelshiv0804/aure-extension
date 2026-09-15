@@ -10,6 +10,7 @@ import { VersionTimeline } from '@/components/popup/VersionTimeline';
 import type { Prompt, PromptHistoryFilters } from '@/types/prompt';
 import { MODE_MAP } from '@/constants/modes';
 import { RoleIcon } from '../common/RoleIcon';
+import { useTheme } from '@/hooks/useTheme';
 
 interface FullHistoryProps {
   onSignIn?: () => void;
@@ -24,6 +25,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const { isAuthenticated, loadAuth } = useAuthStore();
+  const { isDark, D, L } = useTheme();
 
   const handleDeletePrompt = async (promptId: string) => {
     setIsDeletingId(promptId);
@@ -115,7 +117,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
     <div className="p-5 space-y-4">
       {/* Search */}
       <div className="relative">
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: '#8E8EA0' }}>
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
           <RoleIcon name="Search" size={15} strokeWidth={1.75} />
         </div>
         <input
@@ -125,62 +127,75 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[13px] outline-none transition-all duration-200"
           style={{
-            background: '#FFFFFF',
-            border: '1px solid #ECE9FF',
-            color: '#1a1a2e',
+            background: isDark ? D.surface : '#FFFFFF',
+            border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+            color: isDark ? D.textPrimary : '#1a1a2e',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = '#A78BFA'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124, 92, 252, 0.08)'; }}
-          onBlur={e => { e.currentTarget.style.borderColor = '#ECE9FF'; e.currentTarget.style.boxShadow = 'none'; }}
+          onFocus={e => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124, 92, 252, 0.12)'; }}
+          onBlur={e => { e.currentTarget.style.borderColor = isDark ? (D.border as string) : '#ECE9FF'; e.currentTarget.style.boxShadow = 'none'; }}
         />
       </div>
 
       {/* Filter Pills */}
       <div className="flex gap-1.5">
-        {filters.map((f) => (
-          <button
-            key={f.value}
-            onClick={() => setTimeFilter(f.value)}
-            className="transition-all duration-200"
-            style={{
-              padding: '5px 14px',
-              borderRadius: 20,
-              fontSize: 12,
-              fontWeight: timeFilter === f.value ? 600 : 500,
-              cursor: 'pointer',
-              border: 'none',
-              background: timeFilter === f.value
-                ? 'linear-gradient(135deg, #7C5CFC, #9D7BFF)'
-                : 'transparent',
-              color: timeFilter === f.value ? '#FFFFFF' : '#8E8EA0',
-              boxShadow: timeFilter === f.value
-                ? '0 2px 6px rgba(124, 92, 252, 0.2)'
-                : '0 0 0 1px #ECE9FF inset',
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+        {filters.map((f) => {
+          const isSelected = timeFilter === f.value;
+          return (
+            <button
+              key={f.value}
+              onClick={() => setTimeFilter(f.value)}
+              className="transition-all duration-200 cursor-pointer"
+              style={{
+                padding: '5px 14px',
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: isSelected ? 600 : 500,
+                border: 'none',
+                background: isSelected
+                  ? 'linear-gradient(135deg, #7C3AED, #9333EA)'
+                  : isDark ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
+                color: isSelected ? '#FFFFFF' : (isDark ? D.textSecondary : '#8E8EA0'),
+                boxShadow: isSelected
+                  ? '0 2px 8px rgba(124, 58, 237, 0.25)'
+                  : `0 0 0 1px ${isDark ? D.border : '#ECE9FF'} inset`,
+              }}
+            >
+              {f.label}
+            </button>
+          );
+        })}
       </div>
 
       {/* Results */}
       {!isAuthenticated ? (
-        <div className="text-center py-14 px-4 flex flex-col items-center gap-3.5 bg-white border border-[#ECE9FF] rounded-2xl shadow-xs">
+        <div
+          className="text-center py-14 px-4 flex flex-col items-center gap-3.5 rounded-2xl shadow-xs"
+          style={{
+            background: isDark ? D.surface : '#FFFFFF',
+            border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+          }}
+        >
           <div
             className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ background: '#F5F3FF', color: '#7C5CFC' }}
+            style={{
+              background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#F5F3FF',
+              color: isDark ? '#C084FC' : '#7C3AED',
+            }}
           >
             <RoleIcon name="User" size={22} />
           </div>
           <div className="space-y-1">
-            <p className="text-[14px] font-bold text-[#1a1a2e]">Sign In Required</p>
-            <p className="text-[12px] text-[#8E8EA0] max-w-[220px]">
+            <p className="text-[14px] font-bold" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
+              Sign In Required
+            </p>
+            <p className="text-[12px] max-w-[220px]" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>
               Please sign in to view your prompt history and sync prompts across devices.
             </p>
           </div>
           <button
             onClick={() => onSignIn?.()}
             className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)' }}
+            style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)' }}
           >
             Sign In to AURE
           </button>
@@ -191,7 +206,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
             <div
               key={i}
               className="h-16 rounded-xl animate-pulse"
-              style={{ background: '#F0EDF9' }}
+              style={{ background: isDark ? D.surface2 : '#F0EDF9' }}
             />
           ))}
         </div>
@@ -199,13 +214,18 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
         <div className="text-center py-16 flex flex-col items-center gap-3">
           <div
             className="w-12 h-12 rounded-2xl flex items-center justify-center"
-            style={{ background: '#F5F3FF', color: '#A78BFA' }}
+            style={{
+              background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#F5F3FF',
+              color: isDark ? '#C084FC' : '#A78BFA',
+            }}
           >
             <RoleIcon name="FileText" size={22} />
           </div>
           <div>
-            <p className="text-[14px] font-medium" style={{ color: '#1a1a2e' }}>No prompts found</p>
-            <p className="text-[12px] mt-1" style={{ color: '#8E8EA0' }}>
+            <p className="text-[14px] font-medium" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
+              No prompts found
+            </p>
+            <p className="text-[12px] mt-1" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
               Enhanced prompts will appear here
             </p>
           </div>
@@ -218,14 +238,6 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
             const beforeScore = prompt.analysisData?.beforeScore ?? 65;
             const afterScore = prompt.analysisData?.afterScore ?? prompt.successScore ?? 94;
             const diffScore = Math.max(0, afterScore - beforeScore);
-            const dimensions = prompt.analysisData?.dimensions ?? [
-              { name: 'Clarity', before: 85, after: 95 },
-              { name: 'Context', before: 40, after: 100 },
-              { name: 'Role', before: 10, after: 100 },
-              { name: 'Format', before: 30, after: 100 },
-              { name: 'Constraints', before: 20, after: 98 },
-              { name: 'Examples', before: 0, after: 100 },
-            ];
             const recommendations = prompt.analysisData?.recommendations ?? [
               { name: 'Claude', rank: 1, url: 'https://claude.ai/' },
               { name: 'ChatGPT', rank: 2, url: 'https://chatgpt.com/' },
@@ -244,20 +256,24 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                   className="rounded-xl transition-all duration-200 cursor-pointer"
                   style={{
                     padding: '14px 16px',
-                    background: isSelected ? '#F5F3FF' : '#FFFFFF',
-                    border: `1px solid ${isSelected ? '#A78BFA' : '#ECE9FF'}`,
-                    boxShadow: isSelected ? '0 2px 8px rgba(124, 92, 252, 0.08)' : '0 1px 3px rgba(0,0,0,0.02)',
+                    background: isSelected
+                      ? isDark ? 'rgba(139, 92, 246, 0.16)' : '#F5F3FF'
+                      : isDark ? D.surface : '#FFFFFF',
+                    border: `1px solid ${isSelected ? '#8B5CF6' : (isDark ? D.border : '#ECE9FF')}`,
+                    boxShadow: isSelected
+                      ? '0 2px 10px rgba(124, 58, 237, 0.15)'
+                      : isDark ? '0 2px 6px rgba(0,0,0,0.25)' : '0 1px 3px rgba(0,0,0,0.02)',
                   }}
                   onMouseEnter={e => {
                     if (!isSelected) {
-                      e.currentTarget.style.background = '#FAFAFE';
-                      e.currentTarget.style.borderColor = '#DDD6FE';
+                      e.currentTarget.style.background = isDark ? D.surfaceElevated : '#FAFAFE';
+                      e.currentTarget.style.borderColor = '#8B5CF6';
                     }
                   }}
                   onMouseLeave={e => {
                     if (!isSelected) {
-                      e.currentTarget.style.background = '#FFFFFF';
-                      e.currentTarget.style.borderColor = '#ECE9FF';
+                      e.currentTarget.style.background = isDark ? D.surface : '#FFFFFF';
+                      e.currentTarget.style.borderColor = isDark ? (D.border as string) : '#ECE9FF';
                     }
                   }}
                 >
@@ -265,13 +281,13 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                     <div className="flex-1 min-w-0">
                       <h3
                         className="text-[13.5px] font-semibold line-clamp-1"
-                        style={{ color: '#1a1a2e', letterSpacing: '-0.01em' }}
+                        style={{ color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.01em' }}
                       >
                         {prompt.title || prompt.originalText.slice(0, 60)}
                       </h3>
                       <p
                         className="text-[12px] line-clamp-1 mt-1"
-                        style={{ color: '#8E8EA0' }}
+                        style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}
                       >
                         {prompt.originalText}
                       </p>
@@ -281,20 +297,20 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                           <span
                             className="text-[11px] font-medium flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg"
                             style={{
-                              background: '#F5F3FF',
-                              border: '1px solid #ECE9FF',
-                              color: '#7C5CFC',
+                              background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#F5F3FF',
+                              border: `1px solid ${isDark ? 'rgba(167, 139, 250, 0.25)' : '#ECE9FF'}`,
+                              color: isDark ? '#C084FC' : '#7C3AED',
                             }}
                           >
                             <RoleIcon name={modeConfig.icon} size={11} />
                             {modeConfig.label}
                           </span>
                         )}
-                        <span className="text-[11px] font-medium" style={{ color: '#8E8EA0' }}>
+                        <span className="text-[11px] font-medium" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
                           {prompt.platform}
                         </span>
-                        <span className="text-[10px]" style={{ color: '#C4C4D4' }}>•</span>
-                        <span className="text-[11px]" style={{ color: '#8E8EA0' }}>
+                        <span className="text-[10px]" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#C4C4D4' }}>•</span>
+                        <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
                           {new Date(prompt.createdAt).toLocaleDateString()}
                         </span>
                       </div>
@@ -303,12 +319,29 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                     {/* Right side: Score Comparison Badge, Delete Button & Toggle */}
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       <div className="flex items-center gap-1.5">
-                        <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200/80 px-2.5 py-1 rounded-xl shadow-2xs">
-                          <span className="text-[11px] font-semibold text-slate-500">{beforeScore}</span>
+                        <div
+                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl shadow-2xs"
+                          style={{
+                            background: isDark ? D.surface2 : '#F8FAFC',
+                            border: `1px solid ${isDark ? D.border : '#E2E8F0'}`,
+                          }}
+                        >
+                          <span className="text-[11px] font-semibold" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
+                            {beforeScore}
+                          </span>
                           <RoleIcon name="ArrowRight" size={10} className="text-slate-400" />
-                          <span className="text-xs font-bold text-indigo-600">{afterScore}</span>
+                          <span className="text-xs font-bold" style={{ color: isDark ? '#C084FC' : '#7C3AED' }}>
+                            {afterScore}
+                          </span>
                           {diffScore > 0 && (
-                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+                            <span
+                              className="text-[10px] font-bold px-1.5 py-0.2 rounded-full"
+                              style={{
+                                background: isDark ? 'rgba(52, 211, 153, 0.2)' : '#ECFDF5',
+                                color: isDark ? '#34D399' : '#059669',
+                                border: `1px solid ${isDark ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0'}`,
+                              }}
+                            >
                               +{diffScore}
                             </span>
                           )}
@@ -321,13 +354,24 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                             setDeleteConfirmId(prompt.id);
                           }}
                           title="Permanently Delete Prompt"
-                          className="p-1.5 rounded-xl border border-transparent hover:border-rose-200/80 bg-transparent hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-all cursor-pointer"
+                          className="p-1.5 rounded-xl transition-all cursor-pointer"
+                          style={{
+                            color: isDark ? D.textMuted : '#94A3B8',
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.color = '#F43F5E';
+                            e.currentTarget.style.background = isDark ? 'rgba(244, 63, 94, 0.15)' : '#FFF1F2';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.color = isDark ? (D.textMuted as string) : '#94A3B8';
+                            e.currentTarget.style.background = 'transparent';
+                          }}
                         >
                           <RoleIcon name="Trash2" size={14} />
                         </button>
                       </div>
 
-                      <div style={{ color: '#C4C4D4' }} className="flex items-center gap-1 text-[11px]">
+                      <div style={{ color: isDark ? D.textMuted : '#C4C4D4' }} className="flex items-center gap-1 text-[11px]">
                         <span>{isSelected ? 'Less' : 'Details'}</span>
                         <RoleIcon name={isSelected ? 'ChevronDown' : 'ChevronRight'} size={14} />
                       </div>
@@ -342,14 +386,20 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="overflow-hidden space-y-3 p-3.5 bg-slate-50/60 border-x border-b border-purple-200/60 rounded-b-xl"
+                      className="overflow-hidden space-y-3 p-3.5 rounded-b-xl border-x border-b"
+                      style={{
+                        background: isDark ? D.surface2 : 'rgba(248, 250, 252, 0.8)',
+                        borderColor: isDark ? D.border : 'rgba(167, 139, 250, 0.4)',
+                      }}
                     >
 
                       {/* Interactive Recommended AI Models — Dark Theme Ranked Cards */}
                       <div
                         style={{
-                          background: 'linear-gradient(135deg, #1E1B4B 0%, #1a1a3e 100%)',
-                          border: '1px solid rgba(139, 92, 246, 0.3)',
+                          background: isDark
+                            ? 'linear-gradient(135deg, #141320 0%, #1A1827 100%)'
+                            : 'linear-gradient(135deg, #1E1B4B 0%, #1a1a3e 100%)',
+                          border: `1px solid ${isDark ? D.border : 'rgba(139, 92, 246, 0.3)'}`,
                           borderRadius: 18,
                           padding: '12px 14px',
                         }}
@@ -375,7 +425,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                             <p style={{ fontSize: 11, fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
                               Best AI For This Prompt
                             </p>
-                            <p style={{ fontSize: 10, color: '#6D5BD0', margin: 0 }}>Click to open in browser</p>
+                            <p style={{ fontSize: 10, color: '#A5B4FC', margin: 0 }}>Click to open in browser</p>
                           </div>
                         </div>
 
@@ -474,8 +524,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                         </div>
                       </div>
 
-                      {/* Version Timeline with Fixed height scrollable box & Auto-Fill button */}
-
+                      {/* Version Timeline */}
                       <VersionTimeline promptId={prompt.id} analysisData={prompt.analysisData} />
                     </motion.div>
                   )}
@@ -493,7 +542,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs"
             onClick={() => setDeleteConfirmId(null)}
           >
             <motion.div
@@ -501,19 +550,42 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.94, opacity: 0, y: 12 }}
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[320px] bg-white rounded-2xl p-5 border border-rose-100 shadow-2xl space-y-4 font-sans"
+              className="w-full max-w-[320px] rounded-2xl p-5 shadow-2xl space-y-4 font-sans"
+              style={{
+                background: isDark ? D.surface : '#FFFFFF',
+                border: `1px solid ${isDark ? 'rgba(244, 63, 94, 0.3)' : '#FEE2E2'}`,
+                boxShadow: isDark ? '0 12px 36px rgba(0,0,0,0.65)' : '0 10px 25px rgba(0,0,0,0.12)',
+              }}
             >
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0 border border-rose-100 shadow-2xs">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-2xs"
+                  style={{
+                    background: isDark ? 'rgba(244, 63, 94, 0.18)' : '#FFF1F2',
+                    color: '#F43F5E',
+                    border: `1px solid ${isDark ? 'rgba(244, 63, 94, 0.3)' : '#FECDD3'}`,
+                  }}
+                >
                   <RoleIcon name="Trash2" size={20} />
                 </div>
                 <div>
-                  <h4 className="text-[14px] font-bold text-slate-900 leading-tight">Delete Prompt?</h4>
-                  <p className="text-[11.5px] text-slate-500 mt-0.5">Are you sure you want to delete this prompt?</p>
+                  <h4 className="text-[14px] font-bold leading-tight" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
+                    Delete Prompt?
+                  </h4>
+                  <p className="text-[11.5px] mt-0.5" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
+                    Are you sure you want to delete this prompt?
+                  </p>
                 </div>
               </div>
 
-              <div className="text-[11px] text-rose-700 bg-rose-50/80 p-3 rounded-xl border border-rose-100/80 leading-relaxed font-medium">
+              <div
+                className="text-[11px] p-3 rounded-xl leading-relaxed font-medium"
+                style={{
+                  background: isDark ? 'rgba(244, 63, 94, 0.12)' : '#FFF1F2',
+                  color: isDark ? '#FDA4AF' : '#BE123C',
+                  border: `1px solid ${isDark ? 'rgba(244, 63, 94, 0.2)' : '#FECDD3'}`,
+                }}
+              >
                 ⚠️ This will <strong>permanently hard delete</strong> this prompt and all its versions. This action cannot be undone.
               </div>
 
@@ -521,7 +593,12 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                 <button
                   onClick={() => setDeleteConfirmId(null)}
                   disabled={isDeletingId !== null}
-                  className="flex-1 py-2 px-3 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer disabled:opacity-50"
+                  className="flex-1 py-2 px-3 rounded-xl text-xs font-semibold cursor-pointer disabled:opacity-50 transition-colors"
+                  style={{
+                    background: isDark ? D.surface2 : '#F1F5F9',
+                    color: isDark ? D.textSecondary : '#475569',
+                    border: `1px solid ${isDark ? D.border : '#E2E8F0'}`,
+                  }}
                 >
                   Cancel
                 </button>

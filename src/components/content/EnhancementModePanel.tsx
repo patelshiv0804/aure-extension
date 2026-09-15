@@ -9,6 +9,7 @@ import { useEnhanceStore } from '@/stores/enhance.store';
 import { ROLES, ROLE_MODES, getModeIconName } from '@/constants/modes';
 import type { EnhancementMode } from '@/types/enhancement';
 import { RoleIcon } from '../common/RoleIcon';
+import { useTheme } from '@/hooks/useTheme';
 
 interface EnhancementModePanelProps {
   adapter: SiteAdapter;
@@ -19,6 +20,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
   adapter,
   onSelectMode,
 }) => {
+  const { isDark, D, L } = useTheme();
   const {
     currentPrompt,
     flowState,
@@ -138,19 +140,24 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
           display: 'flex',
           flexDirection: 'column',
           fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-          background: '#FFFFFF',
+          background: isDark ? D.surface : '#FFFFFF',
           borderRadius: 20,
-          border: '1px solid #ECE9FF',
-          boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(124, 92, 252, 0.05)',
+          border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+          boxShadow: isDark
+            ? '0 24px 48px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(139, 92, 246, 0.15)'
+            : '0 24px 48px -12px rgba(0, 0, 0, 0.12), 0 0 0 1px rgba(124, 92, 252, 0.05)',
           overflow: 'hidden',
+          color: isDark ? D.textPrimary : '#1a1a2e',
         }}
       >
         {/* Header */}
         <div
           style={{
             padding: '16px 20px 12px',
-            background: 'linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 100%)',
-            borderBottom: '1px solid #ECE9FF',
+            background: isDark
+              ? 'linear-gradient(135deg, #141320 0%, #1A1827 100%)'
+              : 'linear-gradient(135deg, #FAFAFE 0%, #F5F3FF 100%)',
+            borderBottom: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
             flexShrink: 0,
           }}
         >
@@ -162,10 +169,10 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                 style={{ width: 30, height: 30, objectFit: 'contain' }}
               />
               <div>
-                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1a1a2e', letterSpacing: '-0.01em' }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.01em' }}>
                   Select your Role
                 </h3>
-                <p style={{ margin: '2px 0 0', fontSize: 11, color: '#8E8EA0', fontWeight: 400 }}>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: isDark ? D.textSecondary : '#8E8EA0', fontWeight: 400 }}>
                   AURE optimizes your prompt based on the selected role and mode
                 </p>
               </div>
@@ -176,23 +183,23 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                 width: 28,
                 height: 28,
                 borderRadius: 8,
-                border: '1px solid #ECE9FF',
-                background: 'white',
+                border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+                background: isDark ? D.surface2 : 'white',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                color: '#8E8EA0',
+                color: isDark ? D.textMuted : '#8E8EA0',
                 transition: 'all 0.15s',
                 flexShrink: 0,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#F5F3FF';
-                e.currentTarget.style.color = '#7C5CFC';
+                e.currentTarget.style.background = isDark ? D.surfaceElevated : '#F5F3FF';
+                e.currentTarget.style.color = '#8B5CF6';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'white';
-                e.currentTarget.style.color = '#8E8EA0';
+                e.currentTarget.style.background = isDark ? (D.surface2 as string) : 'white';
+                e.currentTarget.style.color = isDark ? (D.textMuted as string) : '#8E8EA0';
               }}
             >
               <RoleIcon name="X" size={14} strokeWidth={2} />
@@ -207,7 +214,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                 left: 10,
                 top: '50%',
                 transform: 'translateY(-50%)',
-                color: '#8E8EA0',
+                color: isDark ? D.textMuted : '#8E8EA0',
                 pointerEvents: 'none',
                 display: 'flex',
               }}
@@ -221,22 +228,21 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: '100%',
-                padding: '8px 12px 8px 32px',
+                padding: '7px 12px 7px 32px',
                 borderRadius: 10,
-                border: '1px solid #ECE9FF',
-                background: 'white',
+                border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+                background: isDark ? D.surface2 : '#FFFFFF',
+                color: isDark ? D.textPrimary : '#1a1a2e',
                 fontSize: 12,
-                color: '#1a1a2e',
                 outline: 'none',
-                transition: 'border-color 0.15s, box-shadow 0.15s',
-                boxSizing: 'border-box',
+                transition: 'all 0.15s',
               }}
               onFocus={(e) => {
-                e.currentTarget.style.borderColor = '#A78BFA';
-                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124, 92, 252, 0.08)';
+                e.currentTarget.style.borderColor = '#8B5CF6';
+                e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139, 92, 246, 0.15)';
               }}
               onBlur={(e) => {
-                e.currentTarget.style.borderColor = '#ECE9FF';
+                e.currentTarget.style.borderColor = isDark ? (D.border as string) : '#ECE9FF';
                 e.currentTarget.style.boxShadow = 'none';
               }}
             />
@@ -274,14 +280,14 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                       padding: '10px 4px 8px',
                       borderRadius: 12,
                       border: isSelected
-                        ? '2px solid #7C5CFC'
+                        ? '2px solid #8B5CF6'
                         : isHovered
-                        ? '1px solid #ECE9FF'
+                        ? `1px solid ${isDark ? D.border : '#ECE9FF'}`
                         : '1px solid transparent',
                       background: isSelected
-                        ? '#F5F3FF'
+                        ? isDark ? 'rgba(139, 92, 246, 0.18)' : '#F5F3FF'
                         : isHovered
-                        ? '#FAFAFE'
+                        ? isDark ? D.surface2 : '#FAFAFE'
                         : 'transparent',
                       cursor: 'pointer',
                       textAlign: 'center',
@@ -306,7 +312,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                         justifyContent: 'center',
                         marginBottom: 4,
                         background: isSelected
-                          ? 'linear-gradient(135deg, #7C5CFC, #9D7BFF)'
+                          ? 'linear-gradient(135deg, #7C3AED, #9333EA)'
                           : `${role.color}12`,
                         color: isSelected ? '#ffffff' : role.color,
                         transition: 'all 0.2s ease',
@@ -320,7 +326,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                       style={{
                         fontSize: 11,
                         fontWeight: isSelected ? 700 : 600,
-                        color: isSelected ? '#7C5CFC' : '#1a1a2e',
+                        color: isSelected ? (isDark ? '#C084FC' : '#7C3AED') : (isDark ? D.textPrimary : '#1a1a2e'),
                         lineHeight: 1.1,
                       }}
                     >
@@ -329,7 +335,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
 
                     {/* Mode Count */}
                     {modeCount > 0 && (
-                      <span style={{ fontSize: 9.5, color: isSelected ? '#7C5CFC' : '#8E8EA0', marginTop: 2 }}>
+                      <span style={{ fontSize: 9.5, color: isSelected ? (isDark ? '#C084FC' : '#7C3AED') : (isDark ? D.textMuted : '#8E8EA0'), marginTop: 2 }}>
                         {modeCount} modes
                       </span>
                     )}
@@ -346,7 +352,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                           width: 14,
                           height: 14,
                           borderRadius: '50%',
-                          background: '#7C5CFC',
+                          background: '#8B5CF6',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
@@ -364,13 +370,13 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
 
           {/* Modes for Selected Role */}
           {activeRoleModes.length > 0 && (
-            <div ref={modesSectionRef} style={{ paddingTop: 8, borderTop: '1px solid #ECE9FF' }}>
+            <div ref={modesSectionRef} style={{ paddingTop: 8, borderTop: `1px solid ${isDark ? D.border : '#ECE9FF'}` }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, paddingLeft: 2 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, color: '#7C5CFC', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <span style={{ fontSize: 10, fontWeight: 700, color: isDark ? '#C084FC' : '#7C3AED', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   {activeRoleObj.label} Modes ({activeRoleModes.length})
                 </span>
-                <span style={{ fontSize: 10, color: '#8E8EA0' }}>
-                  Selected: <strong style={{ color: '#1a1a2e' }}>{selectedRoleMode}</strong>
+                <span style={{ fontSize: 10, color: isDark ? D.textMuted : '#8E8EA0' }}>
+                  Selected: <strong style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>{selectedRoleMode}</strong>
                 </span>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
@@ -390,9 +396,9 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
                         borderRadius: 8,
                         fontSize: 11,
                         fontWeight: isModeSelected ? 700 : 500,
-                        border: isModeSelected ? '1px solid #7C5CFC' : '1px solid #ECE9FF',
-                        background: isModeSelected ? '#7C5CFC' : '#FAFAFE',
-                        color: isModeSelected ? '#FFFFFF' : '#475569',
+                        border: isModeSelected ? '1px solid #8B5CF6' : `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+                        background: isModeSelected ? '#7C3AED' : (isDark ? D.surface2 : '#FAFAFE'),
+                        color: isModeSelected ? '#FFFFFF' : (isDark ? D.textPrimary : '#475569'),
                         cursor: 'pointer',
                         transition: 'all 0.15s ease',
                       }}
@@ -407,7 +413,7 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
           )}
 
           {filteredRoles.length === 0 && (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: '#8E8EA0', fontSize: 12 }}>
+            <div style={{ textAlign: 'center', padding: '24px 0', color: isDark ? D.textMuted : '#8E8EA0', fontSize: 12 }}>
               No roles match "<strong>{searchQuery}</strong>"
             </div>
           )}
@@ -417,8 +423,8 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
         <div
           style={{
             padding: '12px 16px',
-            borderTop: '1px solid #ECE9FF',
-            background: 'linear-gradient(135deg, #FAFAFE, #F5F3FF)',
+            borderTop: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
+            background: isDark ? 'linear-gradient(135deg, #141320, #1A1827)' : 'linear-gradient(135deg, #FAFAFE, #F5F3FF)',
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',

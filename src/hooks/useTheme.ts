@@ -1,31 +1,38 @@
 // ──────────────────────────────────────────────────────────────
-// useTheme — Hook for theme management
+// useTheme — App-wide theme hook matching Prompt_Enhancer-FE
+// Powered by useThemeStore for universal cross-context sync
+// (Popup ⇄ Sidepanel ⇄ Content Scripts ⇄ Settings)
 // ──────────────────────────────────────────────────────────────
 
 import { useEffect } from 'react';
-import { useSettingsStore } from '@/stores/settings.store';
+import { useThemeStore } from '@/stores/theme.store';
+import { D, L } from '@/theme/tokens';
+import type { ThemePreference, Theme } from '@/theme/tokens';
 
 export function useTheme() {
-  const theme = useSettingsStore((s) => s.settings.ui.theme);
+  const preference = useThemeStore((s) => s.preference);
+  const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
+  const isDark = useThemeStore((s) => s.isDark);
+  const setPreference = useThemeStore((s) => s.setPreference);
+  const toggleTheme = useThemeStore((s) => s.toggleTheme);
+  const initTheme = useThemeStore((s) => s.initTheme);
 
   useEffect(() => {
-    const root = document.documentElement;
+    initTheme();
+  }, [initTheme]);
 
-    if (theme === 'system') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.classList.toggle('dark', prefersDark);
-
-      const listener = (e: MediaQueryListEvent) => {
-        root.classList.toggle('dark', e.matches);
-      };
-      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', listener);
-      return () => {
-        window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', listener);
-      };
-    }
-
-    root.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
-
-  return { theme, isDark: theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches) };
+  return {
+    preference,
+    resolvedTheme,
+    theme: resolvedTheme,
+    isDark,
+    setPreference,
+    setTheme: setPreference,
+    toggleTheme,
+    D,
+    L,
+  };
 }
+
+export { D, L };
+export type { ThemePreference, Theme };

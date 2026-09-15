@@ -10,6 +10,8 @@ import { useEnhanceStore } from '@/stores/enhance.store';
 import { useAuthStore } from '@/stores/auth.store';
 import { sendMessage } from '@/lib/messaging';
 import { RoleIcon } from '../common/RoleIcon';
+import { useTheme } from '@/hooks/useTheme';
+import { D, L } from '@/theme/tokens';
 
 interface FloatingEnhanceButtonProps {
   adapter: SiteAdapter;
@@ -35,6 +37,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
 }) => {
   const { flowState, setFlowState, error } = useEnhanceStore();
   const { isAuthenticated, loadAuth } = useAuthStore();
+  const { isDark } = useTheme();
   const [position, setPosition] = useState<{ x: number; y: number; width: number } | null>(null);
   const [isMainHovered, setIsMainHovered] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -240,14 +243,14 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
               style={{
                 fontSize: 12,
                 fontWeight: 700,
-                color: isMainHovered ? '#7C5CFC' : '#1E1B4B',
+                color: isMainHovered ? (isDark ? '#A78BFA' : '#7C5CFC') : (isDark ? '#F5F4F8' : '#1E1B4B'),
                 letterSpacing: '-0.01em',
                 transition: 'color 0.15s ease',
               }}
             >
               Enhance
             </span>
-            <span style={{ color: isMainHovered ? '#7C5CFC' : '#9D7BFF', fontSize: 11, marginLeft: 1, transition: 'color 0.15s ease' }}>
+            <span style={{ color: isMainHovered ? (isDark ? '#A78BFA' : '#7C5CFC') : (isDark ? '#C4B5FD' : '#9D7BFF'), fontSize: 11, marginLeft: 1, transition: 'color 0.15s ease' }}>
               ✦
             </span>
           </div>
@@ -287,11 +290,20 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
           height: BUTTON_HEIGHT,
           padding: flowState === 'enhancing' ? '3px 6px 3px 10px' : '3px 4px 3px 6px',
           borderRadius: '20px',
-          background: '#FFFFFF',
-          border: flowState === 'enhancing' ? '1px solid rgba(167, 139, 250, 0.6)' : '1px solid rgba(236, 233, 255, 0.9)',
-          boxShadow: flowState === 'enhancing'
-            ? '0 6px 20px rgba(124, 92, 252, 0.15), 0 2px 6px rgba(0,0,0,0.04)'
-            : '0 4px 16px rgba(124, 92, 252, 0.08), 0 2px 6px rgba(0,0,0,0.04)',
+          background: isDark ? D.surfaceElevated : '#FFFFFF',
+          border: flowState === 'enhancing'
+            ? '1px solid rgba(167, 139, 250, 0.6)'
+            : isDark
+            ? '1px solid rgba(255, 255, 255, 0.12)'
+            : '1px solid rgba(236, 233, 255, 0.9)',
+          boxShadow: isDark
+            ? (flowState === 'enhancing'
+                ? '0 6px 24px rgba(124, 92, 252, 0.35), 0 2px 8px rgba(0,0,0,0.5)'
+                : '0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0,0,0,0.3)')
+            : (flowState === 'enhancing'
+                ? '0 6px 20px rgba(124, 92, 252, 0.15), 0 2px 6px rgba(0,0,0,0.04)'
+                : '0 4px 16px rgba(124, 92, 252, 0.08), 0 2px 6px rgba(0,0,0,0.04)'),
+          backdropFilter: isDark ? 'blur(12px)' : undefined,
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           userSelect: 'none',
           overflow: 'hidden',
@@ -386,7 +398,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
               <span className="pe-spinner" style={{ display: 'inline-flex', color: '#7C5CFC' }}>
                 <RoleIcon name="Loader2" size={14} strokeWidth={2.5} />
               </span>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#1E1B4B', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: isDark ? D.textPrimary : '#1E1B4B', letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>
                 {stageLabel}
               </span>
               <span
@@ -394,9 +406,9 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
                   fontSize: 11,
                   fontWeight: 800,
                   fontFamily: 'monospace',
-                  color: '#7C5CFC',
-                  background: 'rgba(124, 92, 252, 0.09)',
-                  border: '1px solid rgba(124, 92, 252, 0.2)',
+                  color: isDark ? '#A78BFA' : '#7C5CFC',
+                  background: isDark ? 'rgba(124, 92, 252, 0.2)' : 'rgba(124, 92, 252, 0.09)',
+                  border: isDark ? '1px solid rgba(124, 92, 252, 0.4)' : '1px solid rgba(124, 92, 252, 0.2)',
                   padding: '1px 5px',
                   borderRadius: '6px',
                   minWidth: 32,
@@ -428,18 +440,18 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
                 borderRadius: '14px',
                 background: 'transparent',
                 border: 'none',
-                color: '#A78BFA',
+                color: isDark ? '#A1A1AA' : '#A78BFA',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 padding: 0,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#F5F3FF';
+                e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.08)' : '#F5F3FF';
                 e.currentTarget.style.color = '#7C5CFC';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = '#A78BFA';
+                e.currentTarget.style.color = isDark ? '#A1A1AA' : '#A78BFA';
               }}
             >
               <RoleIcon name="SlidersHorizontal" size={15} strokeWidth={1.8} />
@@ -462,26 +474,26 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
                 borderRadius: '14px',
                 background: 'transparent',
                 border: 'none',
-                color: '#A78BFA',
+                color: isDark ? '#A1A1AA' : '#A78BFA',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
                 padding: 0,
                 marginRight: 4,
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#F5F3FF';
+                e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.08)' : '#F5F3FF';
                 e.currentTarget.style.color = '#7C5CFC';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background = 'transparent';
-                e.currentTarget.style.color = '#A78BFA';
+                e.currentTarget.style.color = isDark ? '#A1A1AA' : '#A78BFA';
               }}
             >
               <RoleIcon name="History" size={15} strokeWidth={1.8} />
             </button>
 
             {/* Vertical divider */}
-            <div style={{ width: 1, height: 16, background: '#ECE9FF', marginRight: 4 }} />
+            <div style={{ width: 1, height: 16, background: isDark ? 'rgba(255, 255, 255, 0.12)' : '#ECE9FF', marginRight: 4 }} />
 
             {/* Main AURE / Enhance Orb Button */}
             <button
@@ -499,7 +511,9 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
                 height: 28,
                 padding: '0 10px',
                 borderRadius: '14px',
-                background: isMainHovered ? 'linear-gradient(135deg, #F3F0FF, #EDE9FE)' : 'transparent',
+                background: isMainHovered
+                  ? (isDark ? 'rgba(124, 92, 252, 0.25)' : 'linear-gradient(135deg, #F3F0FF, #EDE9FE)')
+                  : 'transparent',
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
