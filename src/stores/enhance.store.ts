@@ -59,6 +59,12 @@ interface EnhanceState {
   isUndone: boolean;
   setIsUndone: (isUndone: boolean) => void;
 
+  // Streaming state for side-by-side live viewer
+  streamingText: string;
+  setStreamingText: (streamingText: string) => void;
+  streamProgress: number;
+  setStreamProgress: (streamProgress: number) => void;
+
   // Reset
   reset: () => void;
 }
@@ -102,6 +108,12 @@ export const useEnhanceStore = create<EnhanceState>((set) => ({
   isUndone: false,
   setIsUndone: (isUndone) => set({ isUndone }),
 
+  streamingText: '',
+  setStreamingText: (streamingText) => set({ streamingText }),
+
+  streamProgress: 0,
+  setStreamProgress: (streamProgress) => set({ streamProgress }),
+
   reset: () =>
     set({
       flowState: 'idle',
@@ -112,5 +124,7 @@ export const useEnhanceStore = create<EnhanceState>((set) => ({
       error: null,
       suggestions: [],
       isUndone: false,
+      streamingText: '',
+      streamProgress: 0,
     }),
 }));

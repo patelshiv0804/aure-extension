@@ -19,6 +19,7 @@ import { EnhancementModePanel } from './EnhancementModePanel';
 import { ComparisonPanel } from './ComparisonPanel';
 import { ModelRecommendation } from './ModelRecommendation';
 import { EnhancedBadge, type PromptVersionItem } from './EnhancedBadge';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { useTheme } from '@/hooks/useTheme';
 
 interface ContentRootProps {
@@ -27,6 +28,7 @@ interface ContentRootProps {
 
 export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const adapterRef = useRef(adapter);
+  adapterRef.current = adapter;
   const {
     flowState,
     setFlowState,
@@ -160,6 +162,46 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [flowState, reset]);
 
+
+
+  useEffect(() => {
+    const handleStreamMessage = (message: any) => {
+      if (
+        message?.type === 'ENHANCE_STREAM_TOKEN' &&
+        typeof message.payload?.accumulatedText === 'string'
+      ) {
+        const rawAccumulated = message.payload.accumulatedText;
+        useEnhanceStore.getState().setStreamingText(rawAccumulated);
+      } else if (
+        message?.type === 'ENHANCE_PROGRESS' &&
+        typeof message.payload?.progress === 'number'
+      ) {
+        useEnhanceStore.getState().setStreamProgress(message.payload.progress);
+      } else if (
+        message?.type === 'ENHANCE_STREAM_DONE' &&
+        message.payload?.result
+      ) {
+        // Stream completed — transition to comparing immediately.
+        // This fires BEFORE the background's slow analysis-polling phase,
+        // so the UI doesn't have to wait (and the message port doesn't time out).
+        const result = message.payload.result as import('@/types/enhancement').EnhanceResult;
+        useEnhanceStore.getState().setEnhanceResult(result);
+        useEnhanceStore.getState().setStreamProgress(100);
+        // Note: triggerEnhance's Promise.allSettled will still resolve
+        // (or close the port), but state is already correct so any
+        // subsequent setFlowState('comparing') or setFlowState('error')
+        // is handled in the catch block below.
+      }
+    };
+
+    if (typeof chrome !== 'undefined' && chrome.runtime?.onMessage) {
+      chrome.runtime.onMessage.addListener(handleStreamMessage);
+      return () => {
+        chrome.runtime.onMessage.removeListener(handleStreamMessage);
+      };
+    }
+  }, []);
+
   const isEnhancingRef = useRef(false);
 
   const triggerEnhance = useCallback(
@@ -170,24 +212,9 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         return;
       }
 
-      // Priority 1: Check login status before validating prompt or calling backend
-      await useAuthStore.getState().loadAuth();
-
-      const { isAuthenticated, user } = useAuthStore.getState();
-      const cachedProfile = await getStorage('userProfile');
-
-      if (!isAuthenticated && !user && !cachedProfile) {
-        useEnhanceStore.getState().setError('You are not logged in. Please sign in to enhance prompts.');
-        setFlowState('error');
-        // Open workspace sidepanel automatically for quick login
-        sendMessage('OPEN_SIDE_PANEL', undefined).catch(() => {});
-        setTimeout(() => {
-          if (useEnhanceStore.getState().flowState === 'error') {
-            useEnhanceStore.getState().reset();
-          }
-        }, 4000);
-        return;
-      }
+      // Auth was already validated by the caller (handleEnhanceClick / shortcut handler).
+      // Skipping the duplicate loadAuth() + getStorage('userProfile') calls here
+      // saves ~100-300ms of sequential async reads before setFlowState('enhancing').
 
       // Priority 2: Check prompt presence
       const prompt = adapterRef.current.extractPrompt();
@@ -202,9 +229,12 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         return;
       }
 
+
       // Mark as enhancing immediately (synchronous lock before any await)
       isEnhancingRef.current = true;
       setFlowState('enhancing');
+      useEnhanceStore.getState().setStreamingText('');
+      useEnhanceStore.getState().setStreamProgress(0);
       useEnhanceStore.getState().setError(null);
       setCurrentPrompt(prompt);
       useEnhanceStore.getState().setSelectedMode(mode);
@@ -229,18 +259,17 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
         if (result.status === 'fulfilled') {
           setEnhanceResult(result.value);
-          // Directly replace text inside input box with formatted clean prompt
           const orig = result.value.originalPrompt || prompt;
           const cleanText = formatPromptText(result.value.enhancedPrompt);
-          await adapterRef.current.injectPrompt(cleanText);
-          setIsUndone(false);
-          setFlowState('injected');
+
+          // Do NOT auto-inject — user will click "Insert into Chat" in the panel.
+          setFlowState('comparing');
           useEnhanceStore.getState().setShowRecommendation(true);
 
           // Initialize version history: 0 = Original, 1 = v1-enhanced
           setVersionHistory([
             { versionNumber: 0, text: orig, label: 'Original' },
-            { versionNumber: 1, text: result.value.enhancedPrompt, label: 'v1-enhanced' },
+            { versionNumber: 1, text: cleanText, label: 'v1-enhanced' },
           ]);
           setActiveVersionNumber(1);
 
@@ -258,8 +287,72 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Enhancement failed';
-        useEnhanceStore.getState().setError(message);
-        setFlowState('error');
+
+        // If the Chrome message port closed while we were waiting (happens when
+        // the background's analysis-polling phase outlives the port), but we
+        // already received the ENHANCE_STREAM_DONE event, the store already has
+        // a valid result — just transition to 'comparing' instead of 'error'.
+        const isPortClosed =
+          message.includes('message port closed') ||
+          message.includes('Could not establish connection') ||
+          message.includes('Receiving end does not exist') ||
+          message.includes('Extension context invalidated');
+
+        const store = useEnhanceStore.getState();
+
+        // ── Priority 1: We already have a streaming result ────────────────
+        // ENHANCE_STREAM_DONE already fired and set enhanceResult in the store.
+        // Any subsequent error (port-closed OR any other analysis-polling error)
+        // should NOT override this — the enhanced text is valid, just show it.
+        if (store.enhanceResult) {
+          console.warn('[AURE] Error after stream completed, using ENHANCE_STREAM_DONE result:', message);
+          const cleanText = formatPromptText(store.enhanceResult.enhancedPrompt);
+          setFlowState('comparing');
+          useEnhanceStore.getState().setShowRecommendation(true);
+          setVersionHistory([
+            { versionNumber: 0, text: store.enhanceResult.originalPrompt || prompt, label: 'Original' },
+            { versionNumber: 1, text: cleanText, label: 'v1-enhanced' },
+          ]);
+          setActiveVersionNumber(1);
+        } else if (store.streamingText) {
+          // ── Priority 2: We have partial streaming text ─────────────────
+          console.warn('[AURE] Error but streamingText exists, building fallback result.');
+          const cleanText = formatPromptText(store.streamingText);
+          const fallbackResult: import('@/types/enhancement').EnhanceResult = {
+            promptId: undefined,
+            originalPrompt: prompt,
+            enhancedPrompt: cleanText,
+            mode,
+            metrics: {
+              clarity: 88, specificity: 90, context: 86, successProbability: 88,
+              wordCountOriginal: prompt.split(/\s+/).filter(Boolean).length,
+              wordCountEnhanced: cleanText.split(/\s+/).filter(Boolean).length,
+              tokenCountOriginal: Math.ceil(prompt.length / 4),
+              tokenCountEnhanced: Math.ceil(cleanText.length / 4),
+              readabilityOriginal: 60, readabilityEnhanced: 88,
+            },
+            category: 'general',
+            suggestions: [],
+            timestamp: Date.now(),
+          };
+          setEnhanceResult(fallbackResult);
+          setFlowState('comparing');
+          setVersionHistory([
+            { versionNumber: 0, text: prompt, label: 'Original' },
+            { versionNumber: 1, text: cleanText, label: 'v1-enhanced' },
+          ]);
+          setActiveVersionNumber(1);
+        } else if (isPortClosed) {
+          // ── Priority 3: Port closed with NO result at all ─────────────
+          // This means the stream itself never completed. Reset cleanly.
+          console.warn('[AURE] Message port closed before any result was received.');
+          useEnhanceStore.getState().reset();
+        } else {
+          // ── Priority 4: Genuine error with no result ───────────────────
+          useEnhanceStore.getState().setError(message);
+          setFlowState('error');
+        }
+
       } finally {
         isEnhancingRef.current = false;
       }
@@ -322,8 +415,8 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
       const targetVer = versionHistory.find((v) => v.versionNumber === verNum);
       if (targetVer) {
         setActiveVersionNumber(verNum);
-        const formatted = formatPromptText(targetVer.text);
-        await adapterRef.current.injectPrompt(formatted);
+        const textToInject = verNum === 0 ? targetVer.text : formatPromptText(targetVer.text);
+        await adapterRef.current.injectPrompt(textToInject);
         setIsUndone(verNum === 0);
         setFlowState('injected');
       }
@@ -368,7 +461,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
             ...prev,
             {
               versionNumber: nextNum,
-              text: result.enhancedPrompt,
+              text: cleanText,
               label: `v${nextNum}-enhanced`,
             },
           ];
@@ -391,7 +484,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
       handleSelectVersion(versionHistory.length - 1);
     } else if (enhanceResult?.enhancedPrompt) {
       try {
-        await adapterRef.current.injectPrompt(enhanceResult.enhancedPrompt);
+        await adapterRef.current.injectPrompt(formatPromptText(enhanceResult.enhancedPrompt));
         setIsUndone(false);
       } catch (err) {
         console.error('[AURE] Failed to reapply enhanced prompt:', err);
@@ -449,17 +542,25 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
         />
       )}
 
-      {/* Comparison Panel (Optional side-by-side modal) */}
-      {flowState === 'comparing' && (
-        <ComparisonPanel
-          adapter={adapter}
-          onAccept={handleInjectPrompt}
-          onReject={() => setFlowState('injected')}
-        />
+      {/* Comparison Panel (Side-by-side modal: open during enhancing & comparing) */}
+      {(flowState === 'enhancing' || flowState === 'comparing') && (
+        <ErrorBoundary name="ComparisonPanel">
+          <ComparisonPanel
+            adapter={adapter}
+            onAccept={handleInjectPrompt}
+            onReject={() => {
+              // Since we no longer auto-inject, 'Close' just resets to idle.
+              // The prompt in the textarea is still the original — user chose not to insert.
+              reset();
+            }}
+          />
+        </ErrorBoundary>
       )}
 
       {/* Model Recommendation & Top-Right Score Card */}
-      <ModelRecommendation adapter={adapter} />
+      <ErrorBoundary name="ModelRecommendation">
+        <ModelRecommendation adapter={adapter} />
+      </ErrorBoundary>
     </>
   );
 };

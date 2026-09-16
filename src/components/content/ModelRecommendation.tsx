@@ -9,12 +9,14 @@ import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
 import { MODEL_MAP, AI_MODELS } from '@/constants/models';
 import { RoleIcon } from '../common/RoleIcon';
+import { useTheme } from '@/hooks/useTheme';
 
 interface ModelRecommendationProps {
   adapter: SiteAdapter;
 }
 
 export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapter: _adapter }) => {
+  const { isDark, D } = useTheme();
   const { enhanceResult, recommendation, flowState, setFlowState } = useEnhanceStore();
   const [dismissedId, setDismissedId] = useState<string | null>(null);
 
@@ -112,10 +114,13 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
       >
         <div
           style={{
-            background: '#FFFFFF',
+            background: isDark ? D.surfaceElevated : '#FFFFFF',
             borderRadius: '14px',
-            border: '1px solid #ECE9FF',
-            boxShadow: '0 14px 36px -8px rgba(124, 92, 252, 0.18), 0 0 0 1px rgba(124, 92, 252, 0.08)',
+            border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #ECE9FF',
+            boxShadow: isDark
+              ? '0 16px 40px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06)'
+              : '0 14px 36px -8px rgba(124, 92, 252, 0.18), 0 0 0 1px rgba(124, 92, 252, 0.08)',
+            backdropFilter: isDark ? 'blur(16px)' : undefined,
             overflow: 'hidden',
           }}
         >
@@ -126,8 +131,8 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              background: 'linear-gradient(135deg, #FAFAFE, #F5F3FF)',
-              borderBottom: '1px solid #ECE9FF',
+              background: isDark ? 'rgba(255, 255, 255, 0.03)' : 'linear-gradient(135deg, #FAFAFE, #F5F3FF)',
+              borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
               gap: 8,
             }}
           >
@@ -147,15 +152,15 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
               >
                 <RoleIcon name="Sparkles" size={10} strokeWidth={2.4} />
               </div>
-              <span style={{ fontSize: 11.5, fontWeight: 700, color: '#1E1B4B', letterSpacing: '-0.01em' }}>
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: isDark ? D.textPrimary : '#1E1B4B', letterSpacing: '-0.01em' }}>
                 Prompt Quality Scores
               </span>
               <span
                 style={{
                   fontSize: 9,
                   fontWeight: 700,
-                  color: '#7C5CFC',
-                  background: 'rgba(124, 92, 252, 0.09)',
+                  color: isDark ? '#C084FC' : '#7C5CFC',
+                  background: isDark ? 'rgba(124, 92, 252, 0.2)' : 'rgba(124, 92, 252, 0.09)',
                   padding: '1px 5px',
                   borderRadius: 4,
                   letterSpacing: '0.02em',
@@ -200,19 +205,19 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                   alignItems: 'center',
                   justifyContent: 'center',
                   borderRadius: 5,
-                  color: '#94A3B8',
+                  color: isDark ? D.textMuted : '#94A3B8',
                   background: 'transparent',
                   border: 'none',
                   cursor: 'pointer',
                   transition: 'all 0.15s ease',
                 }}
                 onMouseEnter={e => {
-                  e.currentTarget.style.background = '#F5F3FF';
-                  e.currentTarget.style.color = '#7C5CFC';
+                  e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.08)' : '#F5F3FF';
+                  e.currentTarget.style.color = isDark ? '#C084FC' : '#7C5CFC';
                 }}
                 onMouseLeave={e => {
                   e.currentTarget.style.background = 'transparent';
-                  e.currentTarget.style.color = '#94A3B8';
+                  e.currentTarget.style.color = isDark ? D.textMuted : '#94A3B8';
                 }}
               >
                 <RoleIcon name="X" size={12} strokeWidth={2.2} />
@@ -235,8 +240,8 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                 width: 125,
                 flexShrink: 0,
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #F8F6FF 0%, #F1EDFF 100%)',
-                border: '1px solid #DDD6FE',
+                background: isDark ? 'rgba(124, 92, 252, 0.12)' : 'linear-gradient(135deg, #F8F6FF 0%, #F1EDFF 100%)',
+                border: isDark ? '1px solid rgba(139, 92, 246, 0.28)' : '1px solid #DDD6FE',
                 padding: '7px 9px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -248,7 +253,7 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                   style={{
                     fontSize: 9,
                     fontWeight: 800,
-                    color: '#7C5CFC',
+                    color: isDark ? '#C084FC' : '#7C5CFC',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
                     marginBottom: 3,
@@ -258,17 +263,17 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <span style={{ fontSize: 15, fontWeight: 700, color: '#64748B' }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: isDark ? D.textMuted : '#64748B' }}>
                     {overallBefore}
                   </span>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#A78BFA' }}>
+                  <span style={{ fontSize: 11, fontWeight: 600, color: isDark ? '#A78BFA' : '#A78BFA' }}>
                     →
                   </span>
                   <span
                     style={{
                       fontSize: 20,
                       fontWeight: 900,
-                      color: overallAfter >= 80 ? '#059669' : '#7C5CFC',
+                      color: overallAfter >= 80 ? (isDark ? '#34D399' : '#059669') : (isDark ? '#C084FC' : '#7C5CFC'),
                       letterSpacing: '-0.02em',
                     }}
                   >
@@ -284,9 +289,9 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                   gap: 3,
                   fontSize: 9.5,
                   fontWeight: 800,
-                  color: '#059669',
-                  background: '#ECFDF5',
-                  border: '1px solid #A7F3D0',
+                  color: isDark ? '#34D399' : '#059669',
+                  background: isDark ? 'rgba(16, 185, 129, 0.18)' : '#ECFDF5',
+                  border: isDark ? '1px solid rgba(52, 211, 153, 0.35)' : '1px solid #A7F3D0',
                   padding: '1.5px 5px',
                   borderRadius: '5px',
                   width: 'fit-content',
@@ -304,8 +309,8 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                 flex: 1,
                 minWidth: 290,
                 borderRadius: '10px',
-                background: '#FAFAFE',
-                border: '1px solid #ECE9FF',
+                background: isDark ? D.surface2 : '#FAFAFE',
+                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
                 padding: '7px 9px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -324,7 +329,7 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                   style={{
                     fontSize: 9,
                     fontWeight: 800,
-                    color: '#8E8EA0',
+                    color: isDark ? D.textMuted : '#8E8EA0',
                     textTransform: 'uppercase',
                     letterSpacing: '0.04em',
                   }}
@@ -332,9 +337,9 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                   6 Dimensions
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 8.5, fontWeight: 700 }}>
-                  <span style={{ color: '#8E8EA0' }}>Before</span>
-                  <span style={{ color: '#CBD5E1', fontSize: 8 }}>→</span>
-                  <span style={{ color: '#059669' }}>After</span>
+                  <span style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>Before</span>
+                  <span style={{ color: isDark ? 'rgba(255, 255, 255, 0.2)' : '#CBD5E1', fontSize: 8 }}>→</span>
+                  <span style={{ color: isDark ? '#34D399' : '#059669' }}>After</span>
                 </div>
               </div>
 
@@ -351,8 +356,8 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                   <div
                     key={d.label}
                     style={{
-                      background: '#FFFFFF',
-                      border: '1px solid #ECE9FF',
+                      background: isDark ? D.surfaceElevated : '#FFFFFF',
+                      border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
                       borderRadius: '7px',
                       padding: '4px 7px',
                       display: 'flex',
@@ -360,20 +365,20 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                       justifyContent: 'space-between',
                     }}
                   >
-                    <span style={{ fontSize: 10, fontWeight: 600, color: '#1E1B4B' }}>
+                    <span style={{ fontSize: 10, fontWeight: 600, color: isDark ? D.textPrimary : '#1E1B4B' }}>
                       {d.label}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontWeight: 800 }}>
-                      <span style={{ fontSize: 9.5, fontWeight: 500, color: '#94A3B8' }}>
+                      <span style={{ fontSize: 9.5, fontWeight: 500, color: isDark ? D.textMuted : '#94A3B8' }}>
                         {d.before}
                       </span>
-                      <span style={{ fontSize: 8, color: '#CBD5E1' }}>
+                      <span style={{ fontSize: 8, color: isDark ? 'rgba(255, 255, 255, 0.2)' : '#CBD5E1' }}>
                         →
                       </span>
                       <span
                         style={{
                           fontSize: 10.5,
-                          color: d.after >= 80 ? '#059669' : '#7C5CFC',
+                          color: d.after >= 80 ? (isDark ? '#34D399' : '#059669') : (isDark ? '#C084FC' : '#7C5CFC'),
                         }}
                       >
                         {d.after}
@@ -390,8 +395,8 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                 width: 145,
                 flexShrink: 0,
                 borderRadius: '10px',
-                background: 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
-                border: '1px solid #E9D5FF',
+                background: isDark ? 'rgba(124, 92, 252, 0.08)' : 'linear-gradient(135deg, #FAF5FF 0%, #F5F3FF 100%)',
+                border: isDark ? '1px solid rgba(139, 92, 246, 0.22)' : '1px solid #E9D5FF',
                 padding: '7px 9px',
                 display: 'flex',
                 flexDirection: 'column',
@@ -402,7 +407,7 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                 style={{
                   fontSize: 9,
                   fontWeight: 800,
-                  color: '#7C5CFC',
+                  color: isDark ? '#C084FC' : '#7C5CFC',
                   textTransform: 'uppercase',
                   letterSpacing: '0.04em',
                   marginBottom: 5,
@@ -425,14 +430,14 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                       justifyContent: 'space-between',
                       padding: '3.5px 6px',
                       borderRadius: '6px',
-                      background: '#FFFFFF',
-                      border: '1px solid #ECE9FF',
-                      color: '#6D28D9',
+                      background: isDark ? D.surfaceElevated : '#FFFFFF',
+                      border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+                      color: isDark ? D.textPrimary : '#6D28D9',
                       fontSize: 10,
                       fontWeight: 600,
                       textDecoration: 'none',
                       transition: 'all 0.15s ease',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+                      boxShadow: isDark ? '0 1px 3px rgba(0,0,0,0.3)' : '0 1px 2px rgba(0,0,0,0.02)',
                     }}
                     onMouseEnter={(e) => {
                       e.currentTarget.style.background = 'linear-gradient(135deg, #7C5CFC, #9D7BFF)';
@@ -440,9 +445,9 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                       e.currentTarget.style.borderColor = '#7C5CFC';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = '#FFFFFF';
-                      e.currentTarget.style.color = '#6D28D9';
-                      e.currentTarget.style.borderColor = '#ECE9FF';
+                      e.currentTarget.style.background = isDark ? D.surfaceElevated : '#FFFFFF';
+                      e.currentTarget.style.color = isDark ? D.textPrimary : '#6D28D9';
+                      e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.08)' : '#ECE9FF';
                     }}
                     title={`Open ${tool.name}`}
                   >
@@ -451,8 +456,8 @@ export const ModelRecommendation: React.FC<ModelRecommendationProps> = ({ adapte
                         style={{
                           fontSize: 8.5,
                           fontWeight: 800,
-                          color: '#7C5CFC',
-                          background: 'rgba(124, 92, 252, 0.09)',
+                          color: isDark ? '#C084FC' : '#7C5CFC',
+                          background: isDark ? 'rgba(124, 92, 252, 0.2)' : 'rgba(124, 92, 252, 0.09)',
                           padding: '0.5px 3px',
                           borderRadius: '3px',
                         }}

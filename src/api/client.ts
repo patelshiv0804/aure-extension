@@ -7,6 +7,40 @@ import { resolveApiBaseUrl } from '@/lib/endpoint';
 import { getToken } from '@/lib/token-store';
 import { checkRateLimit, getRetryAfter } from '@/lib/rate-limiter';
 
+// ── Module-level short-lived cache ─────────────────────────────────────────
+// The background service worker calls apiStreamRequest once per enhance.
+// Each call serially awaits 3+ chrome.storage/chrome.cookies reads BEFORE
+// the SSE fetch even starts. Caching these values for 30 seconds eliminates
+// that overhead on warm calls (everything after the first call in a session).
+const CACHE_TTL_MS = 30_000;
+let _cachedBaseUrl: { value: string; ts: number } | null = null;
+let _cachedToken: { value: string | undefined; ts: number } | null = null;
+
+async function getCachedBaseUrl(): Promise<string> {
+  if (_cachedBaseUrl && Date.now() - _cachedBaseUrl.ts < CACHE_TTL_MS) {
+    return _cachedBaseUrl.value;
+  }
+  const value = await resolveApiBaseUrl();
+  _cachedBaseUrl = { value, ts: Date.now() };
+  return value;
+}
+
+async function getCachedToken(): Promise<string | undefined> {
+  if (_cachedToken && Date.now() - _cachedToken.ts < CACHE_TTL_MS) {
+    return _cachedToken.value;
+  }
+  const value = await getApiToken();
+  _cachedToken = { value, ts: Date.now() };
+  return value;
+}
+
+/** Call this whenever the token changes (login/logout) to force a cache refresh. */
+export function invalidateApiClientCache(): void {
+  _cachedBaseUrl = null;
+  _cachedToken = null;
+}
+// ───────────────────────────────────────────────────────────────────────────
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -320,8 +354,9 @@ export async function apiStreamRequest(
   config: RequestConfig,
   onEvent: (event: StreamEvent) => void
 ): Promise<void> {
-  const baseUrl = await getBaseUrl();
-  const token = await getApiToken();
+  // Use cached values to avoid serial storage reads on every stream call.
+  const baseUrl = await getCachedBaseUrl();
+  const token = await getCachedToken();
 
   let url = `${baseUrl}${config.path}`;
   if (config.params) {
@@ -367,6 +402,27 @@ export async function apiStreamRequest(
   const decoder = new TextDecoder();
   let buffer = '';
 
+  const parseFrame = (frame: string): StreamEvent | null => {
+    let event = 'message';
+    const dataLines: string[] = [];
+    for (const rawLine of frame.split('\n')) {
+      const line = rawLine.replace(/\r$/, '');
+      if (!line || line.startsWith(':')) continue;
+      if (line.startsWith('event:')) {
+        event = line.slice(6).trim();
+      } else if (line.startsWith('data:')) {
+        dataLines.push(line.slice(5).replace(/^ /, ''));
+      }
+    }
+    if (dataLines.length === 0) return null;
+    const dataStr = dataLines.join('\n');
+    try {
+      return { event, data: JSON.parse(dataStr) };
+    } catch {
+      return { event, data: dataStr };
+    }
+  };
+
   try {
     while (true) {
       if (config.signal?.aborted) {
@@ -378,31 +434,45 @@ export async function apiStreamRequest(
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+      while (true) {
+        const crlfSep = buffer.indexOf('\r\n\r\n');
+        const lfSep = buffer.indexOf('\n\n');
+        let sep = -1;
+        let delimLen = 2;
 
-      let currentEvent = 'message';
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed) continue;
-        if (trimmed.startsWith('event:')) {
-          currentEvent = trimmed.slice(6).trim();
-        } else if (trimmed.startsWith('data:')) {
-          const rawData = trimmed.slice(5).trim();
-          try {
-            const parsedData = JSON.parse(rawData);
-            onEvent({ event: currentEvent, data: parsedData });
-          } catch {
-            onEvent({ event: currentEvent, data: rawData });
-          }
+        if (crlfSep !== -1 && (lfSep === -1 || crlfSep < lfSep)) {
+          sep = crlfSep;
+          delimLen = 4;
+        } else if (lfSep !== -1) {
+          sep = lfSep;
+          delimLen = 2;
+        }
+
+        if (sep === -1) break;
+
+        const frame = buffer.slice(0, sep);
+        buffer = buffer.slice(sep + delimLen);
+        const parsed = parseFrame(frame);
+        if (parsed) {
+          onEvent(parsed);
         }
       }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) {
+      const parsed = parseFrame(buffer);
+      if (parsed) onEvent(parsed);
     }
   } catch (err) {
     if (config.signal?.aborted) {
       throw new ApiError('Request cancelled by user', 499, 'CANCELLED');
     }
+    console.error('[AURE Stream] Stream processing error:', err);
     throw err;
+  } finally {
+    try {
+      reader.releaseLock();
+    } catch {}
   }
 }
 

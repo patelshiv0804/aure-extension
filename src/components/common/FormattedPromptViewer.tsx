@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Copy, Check, Code as CodeIcon } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
+import { formatPromptText } from '@/lib/formatter';
 
 interface FormattedPromptViewerProps {
   content: string;
@@ -34,7 +35,8 @@ export const FormattedPromptViewer: React.FC<FormattedPromptViewerProps> = ({
     />
   );
 
-  if (!content || !content.trim()) {
+  const cleaned = formatPromptText(content);
+  if (!cleaned || !cleaned.trim()) {
     if (isStreaming) {
       return (
         <div style={{ display: 'flex', alignItems: 'center', minHeight: 20 }}>
@@ -45,7 +47,7 @@ export const FormattedPromptViewer: React.FC<FormattedPromptViewerProps> = ({
     return null;
   }
 
-  let text = content.trim();
+  let text = cleaned;
 
   // 1. Strip leading LLM meta markers like "ENHANCED PROMPT (Production-Ready):", "ENHANCED PROMPT:", etc.
   text = text.replace(/^(?:#{1,6}\s*)?(?:\*{1,2})?(?:ENHANCED PROMPT|OPTIMIZED PROMPT|FINAL PROMPT|SYSTEM PROMPT|PROMPT)\s*(?:\([^)]*\)|\[[^\]]*\])?(?:\*{1,2})?:?\s*/i, '');

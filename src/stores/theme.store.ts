@@ -39,10 +39,13 @@ function getStoredLocalPreference(): ThemePreference | null {
 function applyDomTheme(resolved: Theme) {
   if (typeof document === 'undefined') return;
 
-  const root = document.documentElement;
-  root.classList.toggle('dark', resolved === 'dark');
-  root.classList.toggle('light', resolved === 'light');
-  root.style.colorScheme = resolved;
+  const isExtensionPage = typeof window !== 'undefined' && window.location?.protocol === 'chrome-extension:';
+  if (isExtensionPage) {
+    const root = document.documentElement;
+    root.classList.toggle('dark', resolved === 'dark');
+    root.classList.toggle('light', resolved === 'light');
+    root.style.colorScheme = resolved;
+  }
 
   // Content script container support
   const peApp = document.getElementById('pe-app');

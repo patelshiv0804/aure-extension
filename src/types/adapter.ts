@@ -17,7 +17,7 @@ export interface SiteAdapter {
   extractPrompt(): string;
 
   /** Inject enhanced prompt text into the input field */
-  injectPrompt(text: string): Promise<void>;
+  injectPrompt(text: string, isStreaming?: boolean): Promise<void>;
 
   /** Start observing DOM mutations for input field changes */
   observeChanges(callback: (input: HTMLElement) => void): void;

@@ -5,43 +5,252 @@ import type { EnhanceApiRequest, EnhanceApiResponse } from './types';
 import type { EnhanceResult, PromptCategory, EnhancementMode } from '@/types/enhancement';
 import { MODEL_MAP, AI_MODELS } from '@/constants/models';
 
-export interface EnhanceProgressCallback {
-  (progress: number, stage: string, message: string): void;
+export interface EnhanceStreamCallbacks {
+  onProgress?: (progress: number, stage: string, message: string) => void;
+  onToken?: (token: string, accumulated: string) => void;
+  /** Called immediately when the raw stream tokens finish, BEFORE slow analysis polling.
+   *  The result may lack quality analysis scores (they are filled in by subsequent polling).
+   *  The background uses this to notify the content script early so it can show the UI
+   *  without waiting for the analysis-polling phase which can time out the message port. */
+  onStreamDone?: (result: EnhanceResult) => void;
 }
 
+export type EnhanceProgressCallback = (progress: number, stage: string, message: string) => void;
+
 /**
- * Call the enhancement API (POST /enhance) with real-time UI progress stages.
+ * Call the streaming enhancement API (POST /enhance/stream) with real-time SSE token delivery.
  */
 export async function enhancePromptStream(
   request: EnhanceApiRequest,
-  onProgress: EnhanceProgressCallback,
+  callbacksOrProgress: EnhanceStreamCallbacks | EnhanceProgressCallback,
   signal?: AbortSignal
 ): Promise<EnhanceResult> {
-  // Smooth simulated progress stages for UI responsiveness while backend processes
-  onProgress(15, 'INIT', 'Analyzing Requirements...');
-  const timer1 = setTimeout(() => {
-    if (!signal?.aborted) onProgress(40, 'TEMPLATE', 'Matching Template...');
-  }, 400);
-  const timer2 = setTimeout(() => {
-    if (!signal?.aborted) onProgress(70, 'OPTIMIZING', 'Optimizing Prompt...');
-  }, 1200);
-  const timer3 = setTimeout(() => {
-    if (!signal?.aborted) onProgress(88, 'SCORING', 'Evaluating Quality...');
-  }, 2200);
+  const onProgress =
+    typeof callbacksOrProgress === 'function'
+      ? callbacksOrProgress
+      : callbacksOrProgress?.onProgress;
+  const onToken =
+    typeof callbacksOrProgress === 'object'
+      ? callbacksOrProgress?.onToken
+      : undefined;
+  const onStreamDone =
+    typeof callbacksOrProgress === 'object'
+      ? callbacksOrProgress?.onStreamDone
+      : undefined;
+
+  onProgress?.(10, 'INIT', 'Analyzing Requirements...');
+
+  let accumulatedText = '';
+  let metaData: any = null;
+  let doneData: any = null;
 
   try {
-    const result = await enhancePrompt(request, signal);
-    clearTimeout(timer1);
-    clearTimeout(timer2);
-    clearTimeout(timer3);
-    onProgress(100, 'COMPLETE', 'Prompt enhanced successfully');
-    return result;
+    await apiStreamRequest(
+      {
+        method: 'POST',
+        path: '/enhance/stream',
+        body: {
+          prompt: request.prompt,
+          role: request.role ?? request.mode,
+          mode: request.mode,
+          variables: request.variables,
+          apply_style: request.apply_style,
+          style_profile_id: request.style_profile_id,
+        },
+        rateLimitKey: 'enhance',
+        timeout: 90_000,
+        signal,
+      },
+      (event) => {
+        if (event.event === 'meta') {
+          metaData = event.data;
+          const templateTitle = metaData?.template?.title;
+          onProgress?.(
+            30,
+            'TEMPLATE',
+            templateTitle ? `Matched: ${templateTitle}` : 'Matching Template...'
+          );
+        } else if (event.event === 'token') {
+          const delta =
+            typeof event.data === 'object' && event.data !== null
+              ? event.data.text ?? ''
+              : String(event.data || '');
+          if (delta) {
+            accumulatedText += delta;
+            onToken?.(delta, accumulatedText);
+            const tokenPct = Math.min(94, 35 + Math.floor((accumulatedText.length / 300) * 55));
+            onProgress?.(tokenPct, 'OPTIMIZING', 'Optimizing Prompt...');
+          }
+        } else if (event.event === 'done') {
+          doneData = event.data;
+          onProgress?.(96, 'SCORING', 'Evaluating Quality...');
+        } else if (event.event === 'error') {
+          const errDetail =
+            event.data?.detail || event.data?.message || 'Streaming enhancement failed';
+          throw new Error(typeof errDetail === 'string' ? errDetail : JSON.stringify(errDetail));
+        }
+      }
+    );
+
+    if (doneData) {
+      const formattedOriginal = formatPromptText(doneData.original_prompt || request.prompt);
+      const finalRawEnhanced = doneData.enhanced_prompt || accumulatedText;
+      const formattedEnhanced = formatPromptText(finalRawEnhanced);
+      const originalWords = formattedOriginal.split(/\s+/).filter(Boolean).length;
+      const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
+
+      const promptId =
+        doneData.version?.prompt_id ??
+        (doneData as any).prompt_id ??
+        undefined;
+
+      let origAnalysis = (doneData.original_analysis ?? (doneData as any).old_analysis) as any;
+      let enhAnalysis = (doneData.enhanced_analysis ?? (doneData as any).new_analysis) as any;
+      let toolRecommendations: any = doneData.tool_recommendations;
+
+      const rawTools = toolRecommendations?.tools ?? [];
+      const toolRecs = rawTools.map((t: any) => {
+        const name = t.name ?? 'AI Tool';
+        const info =
+          MODEL_MAP[name.toLowerCase()] ??
+          AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
+        return {
+          name,
+          rank: t.rank ?? 1,
+          url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
+        };
+      });
+
+      // ── Fire onStreamDone IMMEDIATELY with what we have so far ───────────
+      // The content-script UI transitions to 'comparing' without waiting for
+      // the slow analysis-polling phase which can take up to 36 s and causes
+      // the Chrome message-port to close, triggering a false 'error' state.
+      if (onStreamDone) {
+        const earlyBeforeScore = normalizeScore(
+          origAnalysis?.overall_score ?? doneData.comparison?.before_score ?? 0
+        );
+        const earlyAfterScore = normalizeScore(
+          enhAnalysis?.overall_score ?? doneData.comparison?.after_score ?? (earlyBeforeScore || 85)
+        );
+        const earlyImprovement = Math.max(0, earlyAfterScore - earlyBeforeScore);
+        onStreamDone({
+          promptId,
+          originalPrompt: formattedOriginal,
+          enhancedPrompt: formattedEnhanced,
+          mode: request.mode,
+          metrics: {
+            clarity: earlyAfterScore,
+            specificity: Math.min(100, earlyAfterScore + Math.round(earlyImprovement / 2)),
+            context: Math.min(100, earlyAfterScore + Math.round(earlyImprovement / 3)),
+            successProbability: earlyAfterScore,
+            wordCountOriginal: originalWords,
+            wordCountEnhanced: enhancedWords,
+            tokenCountOriginal: Math.ceil(originalWords * 1.3),
+            tokenCountEnhanced: Math.ceil(enhancedWords * 1.3),
+            readabilityOriginal: earlyBeforeScore,
+            readabilityEnhanced: earlyAfterScore,
+          },
+          category: detectCategory(formattedOriginal),
+          suggestions: doneData.comparison?.improvements ?? [],
+          timestamp: Date.now(),
+          originalAnalysis: origAnalysis,
+          enhancedAnalysis: enhAnalysis,
+          toolRecommendations: toolRecs,
+        });
+      }
+
+      // Quality scores are processed in background task: poll DB until ready
+      if (promptId && !hasAnalysis(enhAnalysis) && !signal?.aborted) {
+        const fetched = await fetchEnhancedAnalysis(promptId, signal);
+        if (fetched) {
+          if (hasAnalysis(fetched.old_analysis)) origAnalysis = fetched.old_analysis;
+          if (hasAnalysis(fetched.new_analysis)) enhAnalysis = fetched.new_analysis;
+          if (fetched.tool_recommendations) toolRecommendations = fetched.tool_recommendations;
+        }
+      }
+
+      const beforeScore = normalizeScore(
+        origAnalysis?.overall_score ?? doneData.comparison?.before_score ?? 0
+      );
+      const afterScore = normalizeScore(
+        enhAnalysis?.overall_score ?? doneData.comparison?.after_score ?? (beforeScore || 85)
+      );
+      const improvementScore = Math.max(0, afterScore - beforeScore);
+
+      const finalToolRecs = (toolRecommendations?.tools ?? []).map((t: any) => {
+        const name = t.name ?? 'AI Tool';
+        const info =
+          MODEL_MAP[name.toLowerCase()] ??
+          AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
+        return {
+          name,
+          rank: t.rank ?? 1,
+          url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
+        };
+      });
+
+      const result: EnhanceResult = {
+        promptId,
+        originalPrompt: formattedOriginal,
+        enhancedPrompt: formattedEnhanced,
+        mode: request.mode,
+        metrics: {
+          clarity: afterScore,
+          specificity: Math.min(100, afterScore + Math.round(improvementScore / 2)),
+          context: Math.min(100, afterScore + Math.round(improvementScore / 3)),
+          successProbability: afterScore,
+          wordCountOriginal: originalWords,
+          wordCountEnhanced: enhancedWords,
+          tokenCountOriginal: Math.ceil(originalWords * 1.3),
+          tokenCountEnhanced: Math.ceil(enhancedWords * 1.3),
+          readabilityOriginal: beforeScore,
+          readabilityEnhanced: afterScore,
+        },
+        category: detectCategory(formattedOriginal),
+        suggestions: doneData.comparison?.improvements ?? [],
+        timestamp: Date.now(),
+        originalAnalysis: origAnalysis,
+        enhancedAnalysis: enhAnalysis,
+        toolRecommendations: finalToolRecs,
+      };
+
+      onProgress?.(100, 'COMPLETE', 'Prompt enhanced successfully');
+      historyCache.clear();
+      return result;
+    }
   } catch (err) {
-    clearTimeout(timer1);
-    clearTimeout(timer2);
-    clearTimeout(timer3);
-    throw err;
+    if (signal?.aborted) throw err;
+    console.warn('[AURE] /enhance/stream error, attempting fallback:', err);
+    if (accumulatedText.length > 0) {
+      // If we already accumulated tokens, use them
+      const formattedOriginal = formatPromptText(request.prompt);
+      const formattedEnhanced = formatPromptText(accumulatedText);
+      return {
+        promptId: undefined,
+        originalPrompt: formattedOriginal,
+        enhancedPrompt: formattedEnhanced,
+        mode: request.mode,
+        metrics: {
+          clarity: 88,
+          specificity: 90,
+          context: 86,
+          successProbability: 88,
+          wordCountOriginal: formattedOriginal.split(/\s+/).filter(Boolean).length,
+          wordCountEnhanced: formattedEnhanced.split(/\s+/).filter(Boolean).length,
+          tokenCountOriginal: Math.ceil(formattedOriginal.length / 4),
+          tokenCountEnhanced: Math.ceil(formattedEnhanced.length / 4),
+          readabilityOriginal: 60,
+          readabilityEnhanced: 88,
+        },
+        category: detectCategory(formattedOriginal),
+        suggestions: [],
+        timestamp: Date.now(),
+      };
+    }
   }
+
+  // Graceful fallback to blocking endpoint if stream didn't produce tokens
+  return await enhancePrompt(request, signal);
 }
 
 /**
@@ -314,6 +523,117 @@ export async function reenhancePrompt(
   }
 
   throw new Error('Cannot re-enhance prompt: missing prompt data');
+}
+
+/**
+ * Call the backend re-enhancement streaming API: POST /api/v1/prompts/{prompt_id}/reenhance/stream
+ */
+export async function reenhancePromptStream(
+  promptId: string,
+  fallback?: { prompt: string; mode: EnhancementMode; role?: string },
+  callbacks?: EnhanceStreamCallbacks,
+  signal?: AbortSignal
+): Promise<EnhanceResult> {
+  if (promptId) {
+    let accumulatedText = '';
+    let doneData: any = null;
+
+    try {
+      await apiStreamRequest(
+        {
+          method: 'POST',
+          path: `/prompts/${promptId}/reenhance/stream`,
+          body: {},
+          rateLimitKey: 'enhance',
+          timeout: 90_000,
+          signal,
+        },
+        (event) => {
+          if (event.event === 'token') {
+            const delta =
+              typeof event.data === 'object' && event.data !== null
+                ? event.data.text ?? ''
+                : String(event.data || '');
+            if (delta) {
+              accumulatedText += delta;
+              callbacks?.onToken?.(delta, accumulatedText);
+              const tokenPct = Math.min(94, 30 + Math.floor((accumulatedText.length / 300) * 60));
+              callbacks?.onProgress?.(tokenPct, 'OPTIMIZING', 'Re-enhancing Prompt...');
+            }
+          } else if (event.event === 'done') {
+            doneData = event.data;
+            callbacks?.onProgress?.(96, 'SCORING', 'Evaluating Quality...');
+          } else if (event.event === 'error') {
+            const errDetail =
+              event.data?.detail || event.data?.message || 'Streaming re-enhancement failed';
+            throw new Error(typeof errDetail === 'string' ? errDetail : JSON.stringify(errDetail));
+          }
+        }
+      );
+
+      if (doneData && (doneData.enhanced_prompt || accumulatedText)) {
+        const rawEnhanced = doneData.enhanced_prompt || accumulatedText;
+        const formattedEnhanced = formatPromptText(rawEnhanced);
+        const enhancedWords = formattedEnhanced.split(/\s+/).filter(Boolean).length;
+        const origAnalysis = doneData.old_analysis;
+        const enhAnalysis = doneData.new_analysis;
+
+        const beforeScore = normalizeScore(origAnalysis?.overall_score ?? 0);
+        const afterScore = normalizeScore(enhAnalysis?.overall_score ?? beforeScore);
+        const improvementScore = Math.max(0, afterScore - beforeScore);
+
+        const rawTools = doneData.tool_recommendations?.tools ?? [];
+        const toolRecs = rawTools.map((t: any) => {
+          const name = t.name ?? 'AI Tool';
+          const info =
+            MODEL_MAP[name.toLowerCase()] ??
+            AI_MODELS.find((m) => m.name.toLowerCase() === name.toLowerCase());
+          return {
+            name,
+            rank: t.rank ?? 1,
+            url: info?.url ?? `https://www.google.com/search?q=${encodeURIComponent(name + ' AI')}`,
+          };
+        });
+
+        const originalText = fallback?.prompt ? formatPromptText(fallback.prompt) : '';
+        const originalWords = originalText ? originalText.split(/\s+/).filter(Boolean).length : enhancedWords;
+
+        const result: EnhanceResult = {
+          promptId: doneData.prompt_id || promptId,
+          originalPrompt: originalText,
+          enhancedPrompt: formattedEnhanced,
+          mode: fallback?.mode ?? 'general',
+          metrics: {
+            clarity: afterScore,
+            specificity: Math.min(100, afterScore + Math.round(improvementScore / 2)),
+            context: Math.min(100, afterScore + Math.round(improvementScore / 3)),
+            successProbability: afterScore,
+            wordCountOriginal: originalWords,
+            wordCountEnhanced: enhancedWords,
+            tokenCountOriginal: Math.ceil(originalWords * 1.3),
+            tokenCountEnhanced: Math.ceil(enhancedWords * 1.3),
+            readabilityOriginal: beforeScore,
+            readabilityEnhanced: afterScore,
+          },
+          category: detectCategory(formattedEnhanced),
+          suggestions: [],
+          timestamp: Date.now(),
+          originalAnalysis: origAnalysis,
+          enhancedAnalysis: enhAnalysis,
+          toolRecommendations: toolRecs,
+        };
+
+        callbacks?.onProgress?.(100, 'COMPLETE', 'Re-enhanced successfully');
+        historyCache.clear();
+        return result;
+      }
+    } catch (err) {
+      if (signal?.aborted) throw err;
+      console.warn('[AURE] /prompts/{id}/reenhance/stream error, falling back to blocking:', err);
+    }
+  }
+
+  return await reenhancePrompt(promptId, fallback, signal);
 }
 
 function detectCategory(prompt: string): PromptCategory {

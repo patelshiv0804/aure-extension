@@ -55,7 +55,7 @@ export class ChatGPTAdapter extends BaseAdapter {
    * Uses execCommand('selectAll') + execCommand('insertText') to avoid
    * clearing innerHTML (which breaks MutationObserver and the floating badge).
    */
-  async injectPrompt(text: string): Promise<void> {
+  async injectPrompt(text: string, isStreaming = false): Promise<void> {
     // Detect live input element
     let input = this.detectInput();
     if (!input || !input.isConnected) {
@@ -67,10 +67,16 @@ export class ChatGPTAdapter extends BaseAdapter {
     if (!input) throw new Error('ChatGPT input not found');
     this.currentInput = input;
 
-    // Focus & scroll into view
-    input.focus();
-    input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    await new Promise((r) => setTimeout(r, 60));
+    // Focus & scroll into view (only if not streaming, or if not focused)
+    if (!isStreaming) {
+      input.focus();
+      input.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      await new Promise((r) => setTimeout(r, 40));
+    } else {
+      if (document.activeElement !== input) {
+        input.focus();
+      }
+    }
 
     // Handle HTMLTextAreaElement / HTMLInputElement (rare on ChatGPT)
     if (input instanceof HTMLTextAreaElement || input instanceof HTMLInputElement) {
@@ -89,14 +95,16 @@ export class ChatGPTAdapter extends BaseAdapter {
     }
 
     // Handle ContentEditable div (ChatGPT ProseMirror / Lexical)
-    // IMPORTANT: Do NOT clear innerHTML — that breaks the floating badge by
-    // triggering MutationObserver. Instead use execCommand to replace content.
     if (input.getAttribute('contenteditable') === 'true' || input.isContentEditable) {
-      input.focus();
+      if (document.activeElement !== input) {
+        input.focus();
+      }
 
       // Step 1: Select all existing content
       document.execCommand('selectAll', false);
-      await new Promise((r) => setTimeout(r, 20));
+      if (!isStreaming) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
 
       // Step 2: Insert new text (replaces selection, preserves React state)
       const inserted = document.execCommand('insertText', false, text);

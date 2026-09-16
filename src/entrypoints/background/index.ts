@@ -6,7 +6,13 @@
 import { initMessageListener, onMessage } from '@/lib/messaging';
 import { migrateStorageIfNeeded, getSettings, updateSettings } from '@/lib/storage';
 import { apiRequest, ApiError } from '@/api/client';
-import { enhancePrompt, enhancePromptStream, reenhancePrompt, saveEnhancedPrompt } from '@/api/enhance';
+import {
+  enhancePrompt,
+  enhancePromptStream,
+  reenhancePrompt,
+  reenhancePromptStream,
+  saveEnhancedPrompt,
+} from '@/api/enhance';
 import { saveVersion, getVersions } from '@/api/versions';
 import { getPromptHistory, deletePrompt } from '@/api/history';
 import { recommendModel } from '@/api/recommend';
@@ -46,6 +52,16 @@ export default defineBackground(() => {
   let activeEnhanceController: AbortController | null = null;
   let activeReenhanceController: AbortController | null = null;
 
+  async function resolveTargetTabId(sender: chrome.runtime.MessageSender): Promise<number | undefined> {
+    if (sender.tab?.id) return sender.tab.id;
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      return tabs[0]?.id;
+    } catch {
+      return undefined;
+    }
+  }
+
   // ── Message Handlers ────────────────────────────────────────
 
   onMessage('ENHANCE_PROMPT', async (payload, sender) => {
@@ -57,6 +73,7 @@ export default defineBackground(() => {
     const currentController = activeEnhanceController;
 
     startKeepAlive();
+    const targetTabId = await resolveTargetTabId(sender);
     let result: any = null;
     try {
       result = await enhancePromptStream(
@@ -66,13 +83,34 @@ export default defineBackground(() => {
           role: payload.role,
           context: { platform: payload.platform },
         },
-        (progress, stage, message) => {
-          if (sender.tab?.id) {
-            chrome.tabs.sendMessage(sender.tab.id, {
-              type: 'ENHANCE_PROGRESS',
-              payload: { progress, stage, message },
-            }).catch(() => {});
-          }
+        {
+          onProgress: (progress, stage, message) => {
+            if (targetTabId) {
+              chrome.tabs.sendMessage(targetTabId, {
+                type: 'ENHANCE_PROGRESS',
+                payload: { progress, stage, message },
+              }).catch(() => {});
+            }
+          },
+          onToken: (token, accumulated) => {
+            if (targetTabId) {
+              chrome.tabs.sendMessage(targetTabId, {
+                type: 'ENHANCE_STREAM_TOKEN',
+                payload: { token, accumulatedText: accumulated, isReenhance: false },
+              }).catch(() => {});
+            }
+          },
+          onStreamDone: (streamResult) => {
+            // Fire immediately when stream tokens finish — BEFORE analysis polling.
+            // This lets the content script transition to 'comparing' without waiting
+            // for the slow analysis-polling phase that can outlive the message port.
+            if (targetTabId) {
+              chrome.tabs.sendMessage(targetTabId, {
+                type: 'ENHANCE_STREAM_DONE',
+                payload: { result: streamResult },
+              }).catch(() => {});
+            }
+          },
         },
         currentController.signal
       );
@@ -113,19 +151,30 @@ export default defineBackground(() => {
     return { success: result.success, prompt_id: result.prompt_id };
   });
 
-  onMessage('REENHANCE_PROMPT', async (payload) => {
+  onMessage('REENHANCE_PROMPT', async (payload, sender) => {
     if (activeReenhanceController) {
       activeReenhanceController.abort('New reenhance request started');
     }
     activeReenhanceController = new AbortController();
     const currentController = activeReenhanceController;
+    const targetTabId = await resolveTargetTabId(sender);
 
     try {
-      const result = await reenhancePrompt(
+      const result = await reenhancePromptStream(
         payload.promptId,
         {
           prompt: payload.prompt || '',
           mode: payload.mode || 'general',
+        },
+        {
+          onToken: (token, accumulated) => {
+            if (targetTabId) {
+              chrome.tabs.sendMessage(targetTabId, {
+                type: 'ENHANCE_STREAM_TOKEN',
+                payload: { token, accumulatedText: accumulated, isReenhance: true },
+              }).catch(() => {});
+            }
+          },
         },
         currentController.signal
       );

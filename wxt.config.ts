@@ -38,8 +38,9 @@ export default defineConfig({
     permissions: ['storage', 'activeTab', 'sidePanel', 'cookies'],
     host_permissions: [
       ...AI_HOST_MATCHES,
-      // Local backend access is granted in dev builds only.
-      ...(command === 'serve' ? DEV_HOST_PERMISSIONS : []),
+      ...DEV_HOST_PERMISSIONS,
+      'https://*.aure.ai/*',
+      'https://aure.ai/*',
     ],
     commands: {
       'enhance-prompt': {

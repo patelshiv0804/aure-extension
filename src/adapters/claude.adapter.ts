@@ -32,12 +32,16 @@ export class ClaudeAdapter extends BaseAdapter {
   /**
    * Claude uses ProseMirror editor — uses execCommand for injection.
    */
-  async injectPrompt(text: string): Promise<void> {
+  async injectPrompt(text: string, isStreaming = false): Promise<void> {
     const input = this.currentInput ?? this.detectInput();
     if (!input) throw new Error('Claude input not found');
 
-    input.focus();
-    await new Promise((r) => setTimeout(r, 50));
+    if (!isStreaming) {
+      input.focus();
+      await new Promise((r) => setTimeout(r, 40));
+    } else {
+      if (document.activeElement !== input) input.focus();
+    }
 
     // Select all existing content
     const selection = window.getSelection();

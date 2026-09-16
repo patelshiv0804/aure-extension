@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import type { SiteAdapter } from '@/types/adapter';
 import { getComposerRect, getLeftAnchor } from '@/lib/composer-anchor';
 import { RoleIcon } from '../common/RoleIcon';
+import { useTheme } from '@/hooks/useTheme';
 
 export interface PromptVersionItem {
   versionNumber: number;
@@ -40,6 +41,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
   currentVersionNumber = 2,
   onSelectVersion,
 }) => {
+  const { isDark, D } = useTheme();
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [reenhanceProgress, setReenhanceProgress] = useState(0);
@@ -146,12 +148,15 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           height: 36,
           padding: '0 8px',
           borderRadius: 18,
-          background: '#FFFFFF',
-          border: '1px solid #ECE9FF',
-          boxShadow: '0 4px 20px rgba(124, 92, 252, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
+          background: isDark ? D.surfaceElevated : '#FFFFFF',
+          border: isDark ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid #ECE9FF',
+          boxShadow: isDark
+            ? '0 8px 30px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0,0,0,0.3)'
+            : '0 4px 20px rgba(124, 92, 252, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05)',
+          backdropFilter: isDark ? 'blur(12px)' : undefined,
           fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif",
           userSelect: 'none',
-          overflow: 'hidden',
+          overflow: 'visible',
         }}
       >
         {/* Version Dropdown (when multiple versions exist) OR Standard Undo Button */}
@@ -171,20 +176,22 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                 height: 26,
                 padding: '0 10px',
                 borderRadius: 13,
-                background: isDropdownOpen ? '#EDE9FE' : '#F5F3FF',
-                border: '1px solid rgba(124, 92, 252, 0.25)',
-                color: '#6D28D9',
+                background: isDropdownOpen
+                  ? (isDark ? 'rgba(124, 92, 252, 0.25)' : '#EDE9FE')
+                  : (isDark ? 'rgba(255, 255, 255, 0.06)' : '#F5F3FF'),
+                border: isDark ? '1px solid rgba(167, 139, 250, 0.3)' : '1px solid rgba(124, 92, 252, 0.25)',
+                color: isDark ? '#C084FC' : '#6D28D9',
                 fontSize: 12,
                 fontWeight: 700,
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = '#EDE9FE';
+                e.currentTarget.style.background = isDark ? 'rgba(124, 92, 252, 0.3)' : '#EDE9FE';
               }}
               onMouseLeave={(e) => {
                 if (!isDropdownOpen) {
-                  e.currentTarget.style.background = '#F5F3FF';
+                  e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.06)' : '#F5F3FF';
                 }
               }}
             >
@@ -213,12 +220,14 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                     position: 'absolute',
                     bottom: 'calc(100% + 8px)',
                     left: 0,
-                    minWidth: 165,
-                    background: '#FFFFFF',
+                    minWidth: 175,
+                    background: isDark ? D.surfaceElevated : '#FFFFFF',
                     borderRadius: 14,
-                    border: '1px solid #ECE9FF',
-                    boxShadow: '0 10px 30px rgba(124, 92, 252, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06)',
-                    padding: 5,
+                    border: isDark ? '1px solid rgba(255, 255, 255, 0.14)' : '1px solid #ECE9FF',
+                    boxShadow: isDark
+                      ? '0 12px 36px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.08)'
+                      : '0 10px 30px rgba(124, 92, 252, 0.16), 0 2px 8px rgba(0, 0, 0, 0.06)',
+                    padding: 6,
                     zIndex: 2147483647,
                     display: 'flex',
                     flexDirection: 'column',
@@ -232,7 +241,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                       fontWeight: 700,
                       textTransform: 'uppercase',
                       letterSpacing: '0.04em',
-                      color: '#94A3B8',
+                      color: isDark ? D.textMuted : '#94A3B8',
                     }}
                   >
                     Prompt Versions
@@ -258,8 +267,12 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                           padding: '6px 9px',
                           borderRadius: 9,
                           border: 'none',
-                          background: isSelected ? '#F5F3FF' : 'transparent',
-                          color: isSelected ? '#6D28D9' : '#334155',
+                          background: isSelected
+                            ? (isDark ? 'rgba(124, 92, 252, 0.2)' : '#F5F3FF')
+                            : 'transparent',
+                          color: isSelected
+                            ? (isDark ? '#F5F4F8' : '#6D28D9')
+                            : (isDark ? D.textSecondary : '#334155'),
                           fontSize: 12,
                           fontWeight: isSelected ? 700 : 500,
                           cursor: 'pointer',
@@ -269,14 +282,14 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                         }}
                         onMouseEnter={(e) => {
                           if (!isSelected) {
-                            e.currentTarget.style.background = '#F8FAFC';
-                            e.currentTarget.style.color = '#1E293B';
+                            e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.07)' : '#F8FAFC';
+                            e.currentTarget.style.color = isDark ? D.textPrimary : '#1E293B';
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (!isSelected) {
                             e.currentTarget.style.background = 'transparent';
-                            e.currentTarget.style.color = '#334155';
+                            e.currentTarget.style.color = isDark ? D.textSecondary : '#334155';
                           }
                         }}
                       >
@@ -285,8 +298,12 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                             style={{
                               fontSize: 11,
                               fontWeight: 800,
-                              color: isSelected ? '#7C5CFC' : '#64748B',
-                              background: isSelected ? '#EDE9FE' : '#F1F5F9',
+                              color: isSelected
+                                ? (isDark ? '#C084FC' : '#7C5CFC')
+                                : (isDark ? D.textMuted : '#64748B'),
+                              background: isSelected
+                                ? (isDark ? 'rgba(124, 92, 252, 0.3)' : '#EDE9FE')
+                                : (isDark ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9'),
                               padding: '1px 6px',
                               borderRadius: 5,
                             }}
@@ -298,7 +315,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                           </span>
                         </div>
                         {isSelected && (
-                          <span style={{ color: '#7C5CFC', display: 'flex' }}>
+                          <span style={{ color: isDark ? '#A78BFA' : '#7C5CFC', display: 'flex' }}>
                             <RoleIcon name="Check" size={13} strokeWidth={2.5} />
                           </span>
                         )}
@@ -360,21 +377,21 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
               height: 26,
               padding: '0 8px',
               borderRadius: 13,
-              background: '#F5F3FF',
+              background: isDark ? 'rgba(255, 255, 255, 0.06)' : '#F5F3FF',
               border: 'none',
-              color: '#6D28D9',
+              color: isDark ? '#C084FC' : '#6D28D9',
               fontSize: 12,
               fontWeight: 600,
               cursor: 'pointer',
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#EDE9FE';
-              e.currentTarget.style.color = '#5B21B6';
+              e.currentTarget.style.background = isDark ? 'rgba(124, 92, 252, 0.25)' : '#EDE9FE';
+              e.currentTarget.style.color = isDark ? '#DDD6FE' : '#5B21B6';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = '#F5F3FF';
-              e.currentTarget.style.color = '#6D28D9';
+              e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.06)' : '#F5F3FF';
+              e.currentTarget.style.color = isDark ? '#C084FC' : '#6D28D9';
             }}
           >
             <RoleIcon name="RotateCcw" size={12} strokeWidth={2.2} />
@@ -398,9 +415,11 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
             height: 26,
             padding: isReenhancing ? '0 8px' : '0 10px',
             borderRadius: 13,
-            background: 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
-            border: '1px solid rgba(167, 139, 250, 0.4)',
-            color: '#6D28D9',
+            background: isDark
+              ? 'linear-gradient(135deg, rgba(124, 92, 252, 0.25), rgba(167, 139, 250, 0.12))'
+              : 'linear-gradient(135deg, #F5F3FF, #EDE9FE)',
+            border: isDark ? '1px solid rgba(167, 139, 250, 0.35)' : '1px solid rgba(167, 139, 250, 0.4)',
+            color: isDark ? '#C084FC' : '#6D28D9',
             fontSize: 12,
             fontWeight: 600,
             cursor: isReenhancing ? 'default' : 'pointer',
@@ -408,16 +427,18 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
           }}
           onMouseEnter={(e) => {
             if (!isReenhancing) {
-              e.currentTarget.style.background = '#EDE9FE';
+              e.currentTarget.style.background = isDark ? 'rgba(124, 92, 252, 0.35)' : '#EDE9FE';
               e.currentTarget.style.borderColor = '#A78BFA';
-              e.currentTarget.style.color = '#5B21B6';
+              e.currentTarget.style.color = isDark ? '#DDD6FE' : '#5B21B6';
             }
           }}
           onMouseLeave={(e) => {
             if (!isReenhancing) {
-              e.currentTarget.style.background = 'linear-gradient(135deg, #F5F3FF, #EDE9FE)';
-              e.currentTarget.style.borderColor = 'rgba(167, 139, 250, 0.4)';
-              e.currentTarget.style.color = '#6D28D9';
+              e.currentTarget.style.background = isDark
+                ? 'linear-gradient(135deg, rgba(124, 92, 252, 0.25), rgba(167, 139, 250, 0.12))'
+                : 'linear-gradient(135deg, #F5F3FF, #EDE9FE)';
+              e.currentTarget.style.borderColor = isDark ? 'rgba(167, 139, 250, 0.35)' : 'rgba(167, 139, 250, 0.4)';
+              e.currentTarget.style.color = isDark ? '#C084FC' : '#6D28D9';
             }
           }}
         >
@@ -430,7 +451,7 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                 style={{
                   animation: 'pe-spin 0.75s linear infinite',
                   flexShrink: 0,
-                  color: '#7C5CFC',
+                  color: isDark ? '#A78BFA' : '#7C5CFC',
                 }}
               />
               <span>Re-enhancing</span>
@@ -439,8 +460,8 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
                   fontSize: 10,
                   fontWeight: 800,
                   fontFamily: 'monospace',
-                  color: '#7C5CFC',
-                  background: 'rgba(124, 92, 252, 0.12)',
+                  color: isDark ? '#A78BFA' : '#7C5CFC',
+                  background: isDark ? 'rgba(124, 92, 252, 0.25)' : 'rgba(124, 92, 252, 0.12)',
                   padding: '1px 4px',
                   borderRadius: 4,
                 }}
@@ -474,18 +495,18 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
               borderRadius: 11,
               background: 'transparent',
               border: 'none',
-              color: '#94A3B8',
+              color: isDark ? D.textMuted : '#94A3B8',
               cursor: 'pointer',
               marginLeft: 2,
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = '#F1F5F9';
-              e.currentTarget.style.color = '#475569';
+              e.currentTarget.style.background = isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9';
+              e.currentTarget.style.color = isDark ? D.textPrimary : '#475569';
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.background = 'transparent';
-              e.currentTarget.style.color = '#94A3B8';
+              e.currentTarget.style.color = isDark ? D.textMuted : '#94A3B8';
             }}
           >
             <RoleIcon name="X" size={13} strokeWidth={2} />
@@ -502,14 +523,14 @@ export const EnhancedBadge: React.FC<EnhancedBadgeProps> = ({
               right: 0,
               height: 2.5,
               background: 'rgba(124, 92, 252, 0.1)',
-              borderRadius: '0 0 20px 20px',
+              borderRadius: '0 0 18px 18px',
               overflow: 'hidden',
             }}
           >
             <div
               style={{
                 height: '100%',
-                background: 'linear-gradient(90deg, #7C5CFC, #A78BFA, #10B981)',
+                background: 'linear-gradient(90deg, #7C3AED, #8B5CF6, #A78BFA)',
                 width: `${Math.round(reenhanceProgress)}%`,
                 transition: 'width 0.12s ease-out',
               }}

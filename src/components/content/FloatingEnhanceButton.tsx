@@ -542,7 +542,7 @@ export const FloatingEnhanceButton: React.FC<FloatingEnhanceButtonProps> = ({
             <div
               style={{
                 height: '100%',
-                background: 'linear-gradient(90deg, #7C5CFC 0%, #A78BFA 50%, #10B981 100%)',
+                background: 'linear-gradient(90deg, #7C3AED 0%, #8B5CF6 50%, #A78BFA 100%)',
                 width: `${roundedPct}%`,
                 transition: 'width 0.12s ease-out',
                 boxShadow: '0 0 8px rgba(124, 92, 252, 0.6)',

@@ -74,15 +74,17 @@ export abstract class BaseAdapter implements SiteAdapter {
    * Inject enhanced prompt text into the input field.
    * Uses the configured injection method for framework compatibility.
    */
-  async injectPrompt(text: string): Promise<void> {
+  async injectPrompt(text: string, isStreaming = false): Promise<void> {
     const input = this.currentInput ?? this.detectInput();
     if (!input) throw new Error('No input element found');
 
-    // Focus the input first
-    input.focus();
-
-    // Small delay to ensure focus is registered
-    await sleep(50);
+    // Focus the input
+    if (!isStreaming) {
+      input.focus();
+      await sleep(40);
+    } else {
+      if (document.activeElement !== input) input.focus();
+    }
 
     switch (this.config.injectMethod) {
       case 'react-synthetic':

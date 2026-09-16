@@ -90,9 +90,27 @@ export const L = {
   blue: '#60A5FA',
 } as const;
 
-/** Read OS colour-scheme preference (SSR/fallback safe) */
+/** Read OS colour-scheme preference (SSR/fallback safe) and host page theme */
 export function getSystemTheme(): Theme {
-  if (typeof window === 'undefined' || !window.matchMedia) return 'light';
+  if (typeof window === 'undefined') return 'light';
+
+  // Check if host website (e.g. ChatGPT, Claude) is explicitly in dark mode
+  if (typeof document !== 'undefined') {
+    const docEl = document.documentElement;
+    const body = document.body;
+    if (
+      docEl?.classList.contains('dark') ||
+      body?.classList.contains('dark') ||
+      docEl?.getAttribute('data-theme') === 'dark' ||
+      body?.getAttribute('data-theme') === 'dark' ||
+      docEl?.style.colorScheme === 'dark' ||
+      body?.style.colorScheme === 'dark'
+    ) {
+      return 'dark';
+    }
+  }
+
+  if (!window.matchMedia) return 'light';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
@@ -100,3 +118,4 @@ export function getSystemTheme(): Theme {
 export function resolveTheme(preference: ThemePreference): Theme {
   return preference === 'system' ? getSystemTheme() : preference;
 }
+

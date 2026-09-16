@@ -2,13 +2,14 @@
 // ComparisonPanel — Premium prompt comparison overlay
 // ──────────────────────────────────────────────────────────────
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { diffWords } from 'diff';
 import type { SiteAdapter } from '@/types/adapter';
 import { useEnhanceStore } from '@/stores/enhance.store';
 import { analyzePrompt, calculateImprovements } from '@/lib/analytics';
 import { formatPromptText } from '@/lib/formatter';
+import { FormattedPromptViewer } from '../common/FormattedPromptViewer';
 import { RoleIcon } from '../common/RoleIcon';
 import { useTheme } from '@/hooks/useTheme';
 import { D, L } from '@/theme/tokens';
@@ -24,25 +25,51 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   onReject,
 }) => {
   const { isDark } = useTheme();
-  const { enhanceResult, recommendation, setShowRecommendation } = useEnhanceStore();
+  const {
+    flowState,
+    currentPrompt,
+    enhanceResult,
+    recommendation,
+    setShowRecommendation,
+    streamingText,
+    streamProgress,
+  } = useEnhanceStore();
+
+  const isStreaming = flowState === 'enhancing';
+  const streamScrollRef = useRef<HTMLDivElement>(null);
   const [editedText, setEditedText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [copiedSide, setCopiedSide] = useState<'original' | 'enhanced' | null>(null);
 
-  if (!enhanceResult) return null;
+  // Auto-scroll stream container to bottom as tokens arrive
+  useEffect(() => {
+    if (isStreaming && streamScrollRef.current) {
+      streamScrollRef.current.scrollTop = streamScrollRef.current.scrollHeight;
+    }
+  }, [streamingText, isStreaming]);
 
-  const { originalPrompt, enhancedPrompt, metrics } = enhanceResult;
+  // When flowState switches to 'enhancing', always show the panel
+  // (even before the first token arrives) so the user sees it open immediately.
+  const shouldRender = isStreaming || !!enhanceResult || !!streamingText;
+  if (!shouldRender) return null;
+
+  const originalPrompt = enhanceResult?.originalPrompt || currentPrompt || '';
+  const rawEnhancedPrompt = enhanceResult?.enhancedPrompt || streamingText || '';
+  const enhancedPrompt = enhanceResult ? formatPromptText(rawEnhancedPrompt) : rawEnhancedPrompt;
   const finalText = isEditing ? editedText : enhancedPrompt;
 
   const diffResult = useMemo(
-    () => diffWords(originalPrompt, enhancedPrompt),
-    [originalPrompt, enhancedPrompt]
+    () => (!isStreaming && enhanceResult ? diffWords(originalPrompt, enhancedPrompt) : []),
+    [originalPrompt, enhancedPrompt, isStreaming, enhanceResult]
   );
 
   const originalAnalytics = useMemo(() => analyzePrompt(originalPrompt), [originalPrompt]);
-  const enhancedAnalytics = useMemo(() => analyzePrompt(enhancedPrompt), [enhancedPrompt]);
+  const enhancedAnalytics = useMemo(
+    () => (!isStreaming && enhanceResult ? analyzePrompt(enhancedPrompt) : null),
+    [enhancedPrompt, isStreaming, enhanceResult]
+  );
   const improvements = useMemo(
-    () => calculateImprovements(originalAnalytics, enhancedAnalytics),
+    () => (originalAnalytics && enhancedAnalytics ? calculateImprovements(originalAnalytics, enhancedAnalytics) : null),
     [originalAnalytics, enhancedAnalytics]
   );
 
@@ -127,14 +154,14 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
             <div className="grid grid-cols-2 gap-4 mb-5">
               {/* Original */}
               <div
-                className="rounded-xl overflow-hidden"
+                className="rounded-xl overflow-hidden flex flex-col"
                 style={{
                   border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
                   background: isDark ? D.surface : '#FFFFFF',
                 }}
               >
                 <div
-                  className="px-4 py-2.5 flex items-center justify-between"
+                  className="px-4 py-2.5 flex items-center justify-between flex-shrink-0"
                   style={{ borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF' }}
                 >
                   <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>Original</span>
@@ -152,8 +179,8 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                     </button>
                   </div>
                 </div>
-                <div className="p-4">
-                  <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
+                <div className="p-4 overflow-y-auto max-h-[360px] custom-scrollbar flex-1">
+                  <p className="text-[13px] whitespace-pre-wrap leading-relaxed m-0" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
                     {originalPrompt}
                   </p>
                 </div>
@@ -161,94 +188,160 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
 
               {/* Enhanced */}
               <div
-                className="rounded-xl overflow-hidden"
+                className="rounded-xl overflow-hidden flex flex-col"
                 style={{
                   border: isDark ? '1px solid rgba(124, 92, 252, 0.3)' : '1px solid #A78BFA40',
                   background: isDark ? 'rgba(124, 92, 252, 0.08)' : '#F5F3FF20',
                 }}
               >
                 <div
-                  className="px-4 py-2.5 flex items-center justify-between"
+                  className="px-4 py-2.5 flex items-center justify-between flex-shrink-0"
                   style={{ borderBottom: isDark ? '1px solid rgba(124, 92, 252, 0.2)' : '1px solid #A78BFA30' }}
                 >
-                  <span className="text-[12px] font-semibold" style={{ color: isDark ? '#A78BFA' : '#7C5CFC' }}>Enhanced</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#c4c4d4' }}>
-                      {enhancedAnalytics.wordCount}w · {enhancedAnalytics.tokenCount}t
-                    </span>
-                    <button
-                      onClick={() => handleCopy(enhancedPrompt, 'enhanced')}
-                      className="flex items-center gap-1 transition-colors duration-150"
-                      style={{ fontSize: 11, color: isDark ? D.textSecondary : '#8E8EA0', background: 'none', border: 'none', cursor: 'pointer' }}
-                    >
-                      <RoleIcon name={copiedSide === 'enhanced' ? 'Check' : 'Copy'} size={12} />
-                      {copiedSide === 'enhanced' ? 'Copied' : 'Copy'}
-                    </button>
+                    <span className="text-[12px] font-semibold" style={{ color: isDark ? '#A78BFA' : '#7C5CFC' }}>Enhanced</span>
+                    {isStreaming && (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          color: '#FFFFFF',
+                          background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
+                          padding: '2px 8px',
+                          borderRadius: 99,
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                        Optimizing... {streamProgress > 0 ? `${streamProgress}%` : ''}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {enhancedAnalytics && (
+                      <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#c4c4d4' }}>
+                        {enhancedAnalytics.wordCount}w · {enhancedAnalytics.tokenCount}t
+                      </span>
+                    )}
+                    {!isStreaming && (
+                      <button
+                        onClick={() => handleCopy(finalText, 'enhanced')}
+                        className="flex items-center gap-1 transition-colors duration-150"
+                        style={{ fontSize: 11, color: isDark ? D.textSecondary : '#8E8EA0', background: 'none', border: 'none', cursor: 'pointer' }}
+                      >
+                        <RoleIcon name={copiedSide === 'enhanced' ? 'Check' : 'Copy'} size={12} />
+                        {copiedSide === 'enhanced' ? 'Copied' : 'Copy'}
+                      </button>
+                    )}
                   </div>
                 </div>
-                <div className="p-4">
+                <div
+                  ref={streamScrollRef}
+                  className="p-4 overflow-y-auto max-h-[360px] custom-scrollbar flex-1"
+                >
                   {isEditing ? (
                     <textarea
                       value={editedText}
                       onChange={(e) => setEditedText(e.target.value)}
-                      className="w-full bg-transparent text-[13px] resize-none outline-none min-h-[120px] leading-relaxed"
+                      className="w-full bg-transparent text-[13px] resize-none outline-none min-h-[160px] leading-relaxed"
                       style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}
                       autoFocus
                     />
+                  ) : isStreaming && !streamingText ? (
+                    // Backend is processing — no tokens yet. Show a friendly waiting state.
+                    <div className="flex flex-col items-center justify-center gap-4 py-10">
+                      <div className="relative w-12 h-12">
+                        <div className="absolute inset-0 rounded-full border-[3px] border-violet-500/20" />
+                        <div className="absolute inset-0 rounded-full border-[3px] border-t-violet-500 animate-spin" />
+                      </div>
+                      <div className="text-center">
+                        <p className="text-[13px] font-semibold mb-1" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
+                          AI is enhancing your prompt…
+                        </p>
+                        <p className="text-[11px]" style={{ color: isDark ? D.textMuted : '#94A3B8' }}>
+                          {streamProgress > 0
+                            ? `Stage ${streamProgress}% complete`
+                            : 'Analyzing and optimizing…'}
+                        </p>
+                      </div>
+                    </div>
                   ) : (
-                    <p className="text-[13px] whitespace-pre-wrap leading-relaxed" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
-                      {enhancedPrompt}
-                    </p>
+                    <FormattedPromptViewer
+                      content={isStreaming ? streamingText : enhancedPrompt}
+                      isStreaming={isStreaming}
+                      fontSize={13}
+                    />
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Diff View */}
-            <div
-              className="mb-5 rounded-xl overflow-hidden"
-              style={{
-                border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
-                background: isDark ? D.surface : '#FFFFFF',
-              }}
-            >
-              <div className="px-4 py-2.5" style={{ borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF' }}>
-                <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>Changes</span>
-              </div>
-              <div className="p-4">
-                <div className="text-[13px] leading-relaxed">
-                  {diffResult.map((part, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        background: part.added
-                          ? (isDark ? 'rgba(52, 211, 153, 0.2)' : 'rgba(52, 211, 153, 0.12)')
-                          : part.removed
-                          ? (isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.08)')
-                          : 'transparent',
-                        color: part.added
-                          ? (isDark ? '#34D399' : '#059669')
-                          : part.removed
-                          ? (isDark ? '#F87171' : '#dc2626')
-                          : (isDark ? D.textPrimary : '#1a1a2e'),
-                        textDecoration: part.removed ? 'line-through' : 'none',
-                        padding: part.added || part.removed ? '1px 3px' : 0,
-                        borderRadius: 3,
-                      }}
-                    >
-                      {part.value}
-                    </span>
-                  ))}
+            {/* Diff View (Only when completed) */}
+            {!isStreaming && diffResult.length > 0 && (
+              <div
+                className="mb-5 rounded-xl overflow-hidden"
+                style={{
+                  border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+                  background: isDark ? D.surface : '#FFFFFF',
+                }}
+              >
+                <div className="px-4 py-2.5" style={{ borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF' }}>
+                  <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>Changes</span>
+                </div>
+                <div className="p-4">
+                  <div className="text-[13px] leading-relaxed">
+                    {diffResult.map((part, i) => (
+                      <span
+                        key={i}
+                        style={{
+                          background: part.added
+                            ? (isDark ? 'rgba(52, 211, 153, 0.2)' : 'rgba(52, 211, 153, 0.12)')
+                            : part.removed
+                            ? (isDark ? 'rgba(239, 68, 68, 0.2)' : 'rgba(239, 68, 68, 0.08)')
+                            : 'transparent',
+                          color: part.added
+                            ? (isDark ? '#34D399' : '#059669')
+                            : part.removed
+                            ? (isDark ? '#F87171' : '#dc2626')
+                            : (isDark ? D.textPrimary : '#1a1a2e'),
+                          textDecoration: part.removed ? 'line-through' : 'none',
+                          padding: part.added || part.removed ? '1px 3px' : 0,
+                          borderRadius: 3,
+                        }}
+                      >
+                        {part.value}
+                      </span>
+                    ))}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Overall Score & 6 Dimensions Grid (Image 1 Layout) */}
+            {/* Overall Score & 6 Dimensions Grid */}
             {(() => {
-              const origAnalysis = enhanceResult.originalAnalysis;
-              const enhAnalysis = enhanceResult.enhancedAnalysis;
+              if (isStreaming || !enhanceResult) {
+                return (
+                  <div
+                    className="rounded-2xl p-6 mb-5 flex flex-col items-center justify-center gap-3 text-center"
+                    style={{
+                      background: isDark ? D.surface : '#FFFFFF',
+                      border: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF',
+                    }}
+                  >
+                    <div className="w-6 h-6 rounded-full border-2 border-violet-500 border-t-transparent animate-spin" />
+                    <span style={{ fontSize: 13, fontWeight: 500, color: isDark ? D.textSecondary : '#64748B' }}>
+                      Streaming enhanced prompt in real-time... Dimension scores will appear upon completion.
+                    </span>
+                  </div>
+                );
+              }
 
-              const getDimScore = (analysis: typeof origAnalysis, keys: string[], fallback: number): number => {
+              const origAnalysis = enhanceResult?.originalAnalysis;
+              const enhAnalysis = enhanceResult?.enhancedAnalysis;
+
+              const getDimScore = (analysis: any, keys: string[], fallback: number): number => {
                 if (!analysis?.dimensions) return fallback;
                 for (const key of keys) {
                   const item = (analysis.dimensions as Record<string, any>)?.[key];
@@ -259,7 +352,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 return fallback;
               };
 
-              const getDimDesc = (analysis: typeof enhAnalysis, keys: string[], fallbackDesc: string): string => {
+              const getDimDesc = (analysis: any, keys: string[], fallbackDesc: string): string => {
                 if (!analysis?.dimensions) return fallbackDesc;
                 for (const key of keys) {
                   const item = (analysis.dimensions as Record<string, any>)?.[key];
@@ -534,17 +627,19 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
             }}
           >
             <div className="flex gap-2">
-              <button
-                onClick={handleEdit}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
-                style={{ fontSize: 13, fontWeight: 500, color: isDark ? D.textSecondary : '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
-                onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? D.textSecondary : '#8E8EA0'; }}
-              >
-                <RoleIcon name="Pencil" size={14} />
-                {isEditing ? 'Preview' : 'Edit'}
-              </button>
-              {recommendation && (
+              {!isStreaming && (
+                <button
+                  onClick={handleEdit}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
+                  style={{ fontSize: 13, fontWeight: 500, color: isDark ? D.textSecondary : '#8E8EA0', background: 'transparent', border: 'none', cursor: 'pointer' }}
+                  onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.color = '#7C5CFC'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = isDark ? D.textSecondary : '#8E8EA0'; }}
+                >
+                  <RoleIcon name="Pencil" size={14} />
+                  {isEditing ? 'Preview' : 'Edit'}
+                </button>
+              )}
+              {!isStreaming && recommendation && (
                 <button
                   onClick={() => setShowRecommendation(true)}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all duration-200"
@@ -570,23 +665,25 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 onMouseEnter={e => { e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : '#F5F3FF'; e.currentTarget.style.borderColor = '#A78BFA'; }}
                 onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = isDark ? 'rgba(255, 255, 255, 0.12)' : '#ECE9FF'; }}
               >
-                Discard
+                {isStreaming ? 'Cancel' : 'Close'}
               </button>
-              <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                onClick={() => onAccept(formatPromptText(finalText))}
-                className="flex items-center gap-2 px-5 py-2.5 rounded-xl"
-                style={{
-                  fontSize: 13, fontWeight: 600, color: '#FFFFFF',
-                  background: 'linear-gradient(135deg, #7C5CFC, #9D7BFF)',
-                  boxShadow: '0 4px 12px rgba(124, 92, 252, 0.3)',
-                  border: 'none', cursor: 'pointer',
-                }}
-              >
-                <RoleIcon name="Check" size={15} strokeWidth={2.5} />
-                Accept & Apply
-              </motion.button>
+              {!isStreaming && (
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onAccept(finalText)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl"
+                  style={{
+                    fontSize: 13, fontWeight: 600, color: '#FFFFFF',
+                    background: 'linear-gradient(135deg, #7C3AED, #A855F7)',
+                    boxShadow: '0 4px 14px rgba(124, 58, 237, 0.35)',
+                    border: 'none', cursor: 'pointer',
+                  }}
+                >
+                  <RoleIcon name="ArrowDownToLine" size={15} strokeWidth={2.5} />
+                  Insert into Chat
+                </motion.button>
+              )}
             </div>
           </div>
         </motion.div>
