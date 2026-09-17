@@ -10,11 +10,13 @@ import { AuthView } from '../auth/AuthView';
 import { RoleIcon } from '../common/RoleIcon';
 import { ThemeToggle } from '../common/ThemeToggle';
 import { AppearanceSettings } from '../settings/AppearanceSettings';
+import { ExportContextView } from './ExportContextView';
 
-type SidePanelTab = 'history' | 'analytics' | 'settings';
+type SidePanelTab = 'history' | 'context' | 'analytics' | 'settings';
 
 export const SidePanelRoot: React.FC = () => {
   const [activeTab, setActiveTab] = useState<SidePanelTab>('history');
+  const [contextExportInitialIds, setContextExportInitialIds] = useState<string[] | undefined>(undefined);
   const [showAuthView, setShowAuthView] = useState(false);
   const { loadSettings } = useSettingsStore();
   const { user, isAuthenticated, loadAuth, logout } = useAuthStore();
@@ -72,12 +74,33 @@ export const SidePanelRoot: React.FC = () => {
     loadAuth();
     checkActiveTab();
 
+    const checkTargetTab = () => {
+      if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+        chrome.storage.local.get('targetSidePanelTab', (res) => {
+          const target = res?.targetSidePanelTab as SidePanelTab | undefined;
+          if (target && ['history', 'analytics', 'context', 'settings'].includes(target)) {
+            setActiveTab(target);
+            setShowAuthView(false);
+            chrome.storage.local.remove('targetSidePanelTab');
+          }
+        });
+      }
+    };
+    checkTargetTab();
+
     const handleStorageChange = (changes: Record<string, chrome.storage.StorageChange>, areaName: string) => {
-      if (
-        areaName === 'local' &&
-        (changes['userProfile'] || changes['currentUserEmail'])
-      ) {
-        loadAuth();
+      if (areaName === 'local') {
+        if (changes['targetSidePanelTab']?.newValue) {
+          const target = changes['targetSidePanelTab'].newValue as SidePanelTab;
+          if (['history', 'analytics', 'context', 'settings'].includes(target)) {
+            setActiveTab(target);
+            setShowAuthView(false);
+            chrome.storage.local.remove('targetSidePanelTab');
+          }
+        }
+        if (changes['userProfile'] || changes['currentUserEmail']) {
+          loadAuth();
+        }
       }
     };
 
@@ -127,6 +150,7 @@ export const SidePanelRoot: React.FC = () => {
   const tabs: Array<{ id: SidePanelTab; label: string; icon: string }> = [
     { id: 'history', label: 'History', icon: 'Clock' },
     { id: 'analytics', label: 'Analytics', icon: 'BarChart3' },
+    { id: 'context', label: 'Context', icon: 'Download' },
     { id: 'settings', label: 'Settings', icon: 'Settings' },
   ];
 
@@ -184,7 +208,7 @@ export const SidePanelRoot: React.FC = () => {
               target="_blank"
               rel="noreferrer"
               className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white shadow-sm flex items-center justify-center gap-2 transition-transform active:scale-95 cursor-pointer"
-              style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)' }}
+              style={{ background: '#7C3AED' }}
             >
               Open ChatGPT
               <RoleIcon name="ExternalLink" size={13} strokeWidth={2} />
@@ -197,7 +221,7 @@ export const SidePanelRoot: React.FC = () => {
 
   return (
     <div
-      className="relative flex flex-col min-h-screen"
+      className="relative flex flex-col h-screen max-h-screen overflow-hidden"
       style={{
         background: isDark ? D.bg : L.bg,
         color: isDark ? D.textPrimary : L.textPrimary,
@@ -206,7 +230,7 @@ export const SidePanelRoot: React.FC = () => {
     >
       {/* ── Header ─────────────────────────────────────────── */}
       <div
-        className="sticky top-0 z-10"
+        className="shrink-0 z-20"
         style={{
           background: isDark ? 'rgba(14, 13, 20, 0.88)' : 'rgba(250, 250, 254, 0.88)',
           backdropFilter: 'blur(16px)',
@@ -214,19 +238,30 @@ export const SidePanelRoot: React.FC = () => {
           borderBottom: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
         }}
       >
-        <div className="px-5 pt-4 pb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img
-              src="/logo.png"
-              className="w-8 h-8 object-contain"
-              alt="AURE"
-            />
-            <div>
-              <h1 className="text-[15px] font-bold" style={{ color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.02em' }}>
-                AURE
-              </h1>
-              <p className="text-[11px]" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>Workspace</p>
-            </div>
+        <div className="px-4 pt-3.5 pb-2.5 flex items-center justify-between">
+          <div className="flex flex-col min-w-0 pr-2">
+            <h1 className="text-[13.5px] font-semibold tracking-tight leading-tight" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
+              {showAuthView
+                ? 'Account'
+                : activeTab === 'history'
+                ? 'History'
+                : activeTab === 'analytics'
+                ? 'Analytics'
+                : activeTab === 'context'
+                ? 'Context'
+                : 'Settings'}
+            </h1>
+            <p className="text-[10px] leading-normal truncate mt-0.5" style={{ color: isDark ? D.textMuted : '#64748B' }}>
+              {showAuthView
+                ? 'Manage your account and synchronization.'
+                : activeTab === 'history'
+                ? 'Search, review, and restore your enhanced prompts.'
+                : activeTab === 'analytics'
+                ? 'Track prompt quality scores and AI model usage.'
+                : activeTab === 'context'
+                ? 'Export prompts and clean context for AI models.'
+                : 'Customize appearance and workspace preferences.'}
+            </p>
           </div>
 
           <div className="flex items-center gap-2">
@@ -332,7 +367,7 @@ export const SidePanelRoot: React.FC = () => {
                 style={{
                   background: showAuthView
                     ? isDark ? 'rgba(255, 255, 255, 0.12)' : '#E2E8F0'
-                    : 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)',
+                    : '#7C3AED',
                   color: showAuthView
                     ? isDark ? D.textPrimary : '#334155'
                     : '#FFFFFF',
@@ -343,63 +378,10 @@ export const SidePanelRoot: React.FC = () => {
             )}
           </div>
         </div>
-
-        {/* Segmented Control */}
-        {!showAuthView && (
-          <div className="px-5 pb-3">
-            <div
-              className="flex rounded-xl p-1"
-              style={{
-                background: isDark ? 'rgba(20, 19, 32, 0.85)' : '#F0EDF9',
-                border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(124, 58, 237, 0.10)'}`,
-                boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : 'inset 0 1px 2px rgba(0,0,0,0.04)',
-              }}
-            >
-              {tabs.map((tab) => {
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className="relative flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-lg transition-all duration-200 cursor-pointer"
-                    style={{
-                      fontSize: 12,
-                      fontWeight: isActive ? 700 : 500,
-                      color: isActive
-                        ? isDark ? '#C084FC' : '#7C3AED'
-                        : isDark ? D.textMuted : '#64748B',
-                      background: 'transparent',
-                      border: 'none',
-                      position: 'relative',
-                      zIndex: 1,
-                    }}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="sidepanelSegmentedTab"
-                        className="absolute inset-0 rounded-lg"
-                        style={{
-                          background: isDark ? 'rgba(255, 255, 255, 0.12)' : '#FFFFFF',
-                          boxShadow: isDark
-                            ? '0 2px 8px rgba(0,0,0,0.4)'
-                            : '0 1px 4px rgba(109, 40, 217, 0.12)',
-                          zIndex: -1,
-                        }}
-                        transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-                      />
-                    )}
-                    <RoleIcon name={tab.icon} size={13} strokeWidth={isActive ? 2.2 : 1.75} />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* ── Content ────────────────────────────────────────── */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-y-auto min-h-0">
         <AnimatePresence mode="wait">
           {showAuthView && !isAuthenticated ? (
             <motion.div
@@ -420,13 +402,23 @@ export const SidePanelRoot: React.FC = () => {
               exit={{ opacity: 0, y: -6 }}
               transition={{ duration: 0.15 }}
             >
-              {activeTab === 'history' && <FullHistory onSignIn={() => setShowAuthView(true)} />}
+              {activeTab === 'history' && (
+                <FullHistory
+                  onSignIn={() => setShowAuthView(true)}
+                />
+              )}
+              {activeTab === 'context' && (
+                <ExportContextView
+                  initialSelectedIds={contextExportInitialIds}
+                  onSignIn={() => setShowAuthView(true)}
+                />
+              )}
               {activeTab === 'analytics' && <Analytics onNavigateHistory={() => setActiveTab('history')} />}
               {activeTab === 'settings' && (
-                <div className="p-5 space-y-6">
+                <div className="p-3.5 space-y-3.5">
                   {/* Appearance section inside Sidepanel */}
                   <div
-                    className="p-5 rounded-2xl"
+                    className="p-4 rounded-xl"
                     style={{
                       background: isDark ? D.surface : '#FFFFFF',
                       border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
@@ -435,12 +427,12 @@ export const SidePanelRoot: React.FC = () => {
                         : '0 4px 16px rgba(124, 58, 237, 0.04)',
                     }}
                   >
-                    <AppearanceSettings />
+                    <AppearanceSettings compact={true} />
                   </div>
 
                   {/* Account Summary Card */}
                   <div
-                    className="p-5 rounded-2xl"
+                    className="p-4 rounded-xl"
                     style={{
                       background: isDark ? D.surface : '#FFFFFF',
                       border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
@@ -450,13 +442,13 @@ export const SidePanelRoot: React.FC = () => {
                     }}
                   >
                     <h3
-                      className="text-sm font-bold mb-1"
+                      className="text-[13px] font-semibold mb-1"
                       style={{ color: isDark ? D.textPrimary : '#0F172A' }}
                     >
                       Account & Sync
                     </h3>
                     <p
-                      className="text-xs mb-3"
+                      className="text-[11.5px] mb-3 leading-relaxed"
                       style={{ color: isDark ? D.textSecondary : '#64748B' }}
                     >
                       {isAuthenticated && user
@@ -466,7 +458,7 @@ export const SidePanelRoot: React.FC = () => {
 
                     {isAuthenticated && user ? (
                       <div
-                        className="flex items-center justify-between p-3 rounded-xl"
+                        className="flex items-center justify-between p-2.5 rounded-lg"
                         style={{
                           background: isDark ? D.surface2 : '#F8FAFC',
                           border: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : '#E2E8F0'}`,
@@ -474,12 +466,12 @@ export const SidePanelRoot: React.FC = () => {
                       >
                         <div className="flex items-center gap-2">
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-xs font-semibold" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
+                          <span className="text-[11.5px] font-medium" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
                             {user.display_name || user.email}
                           </span>
                         </div>
                         <span
-                          className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
+                          className="text-[9.5px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full"
                           style={{
                             background: isDark ? 'rgba(139, 92, 246, 0.2)' : '#EDE9FE',
                             color: isDark ? '#C084FC' : '#7C3AED',
@@ -491,8 +483,8 @@ export const SidePanelRoot: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => setShowAuthView(true)}
-                        className="w-full py-2 px-4 rounded-xl text-xs font-bold text-white shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-transform active:scale-95"
-                        style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)' }}
+                        className="w-full py-2 px-3 rounded-lg text-[11.5px] font-semibold text-white shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-transform active:scale-95 hover:opacity-90"
+                        style={{ background: '#7C3AED' }}
                       >
                         Sign In to Sync History
                       </button>
@@ -504,6 +496,80 @@ export const SidePanelRoot: React.FC = () => {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ── Mobile-Style Bottom Navigation Bar ──────────────── */}
+      <nav
+        aria-label="Mobile Navigation"
+        className="shrink-0 z-30 w-full select-none"
+        style={{
+          background: isDark ? 'rgba(14, 13, 20, 0.94)' : 'rgba(255, 255, 255, 0.96)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
+          borderTop: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : '#ECE9FF'}`,
+          boxShadow: isDark
+            ? '0 -6px 24px rgba(0, 0, 0, 0.5)'
+            : '0 -4px 20px rgba(124, 58, 237, 0.06)',
+        }}
+      >
+        <div className="grid grid-cols-4 items-center px-2 py-1.5 gap-1">
+          {tabs.map((tab) => {
+            const isActive = !showAuthView && activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setShowAuthView(false);
+                }}
+                className="relative flex flex-col items-center justify-center py-1.5 px-1 rounded-xl transition-all cursor-pointer group"
+                style={{
+                  color: isActive
+                    ? isDark ? '#C084FC' : '#7C3AED'
+                    : isDark ? '#94A3B8' : '#64748B',
+                }}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="mobileNavPill"
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: isDark
+                        ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.18) 0%, rgba(139, 92, 246, 0.12) 100%)'
+                        : 'linear-gradient(135deg, rgba(124, 58, 237, 0.12) 0%, rgba(147, 51, 234, 0.08) 100%)',
+                      border: `1px solid ${isDark ? 'rgba(192, 132, 252, 0.28)' : 'rgba(124, 58, 237, 0.2)'}`,
+                    }}
+                    transition={{ type: 'spring', stiffness: 450, damping: 35 }}
+                  />
+                )}
+
+                <div
+                  className="relative z-10 transition-transform duration-150"
+                  style={{ transform: isActive ? 'scale(1.05)' : 'scale(1)' }}
+                >
+                  <RoleIcon
+                    name={tab.icon}
+                    size={16}
+                    strokeWidth={isActive ? 2.1 : 1.7}
+                  />
+                </div>
+
+                <span
+                  className="relative z-10 text-[10px] mt-0.5 tracking-normal transition-all"
+                  style={{
+                    fontWeight: isActive ? 600 : 450,
+                    color: isActive
+                      ? isDark ? '#F1F5F9' : '#0F172A'
+                      : isDark ? '#94A3B8' : '#64748B',
+                  }}
+                >
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 };
+

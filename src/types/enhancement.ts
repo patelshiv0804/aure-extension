@@ -28,9 +28,13 @@ export interface EnhancementModeConfig {
   examples: string[];
 }
 
+export type EnhancementLevel = 'auto' | 'minimal' | 'standard' | 'deep';
+
 export interface EnhanceRequest {
   prompt: string;
   mode: EnhancementMode;
+  role?: string;
+  enhancement_level?: EnhancementLevel;
   context?: {
     platform: string;
     previousPrompts?: string[];
@@ -80,6 +84,10 @@ export interface EnhanceResult {
   originalAnalysis?: PromptAnalysisData;
   enhancedAnalysis?: PromptAnalysisData;
   toolRecommendations?: RecommendedToolItem[];
+  versionNumber?: number;
+  versionId?: string;
+  detectedLevel?: string;
+  levelReason?: string;
 }
 
 export interface EnhancementMetrics {

@@ -26,6 +26,8 @@ import {
   X,
   Check,
   CheckCircle,
+  CheckSquare,
+  Square,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -33,6 +35,8 @@ import {
   Minus,
   ArrowUpRight,
   ArrowRight,
+  ArrowDownToLine,
+  Download,
   ExternalLink,
 
   // Navigation & actions
@@ -43,6 +47,7 @@ import {
   Layers,
   Globe,
   Zap,
+  Feather,
   Copy,
   Pencil,
   Trash2,
@@ -118,6 +123,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   X,
   Check,
   CheckCircle,
+  CheckSquare,
+  Square,
   ChevronRight,
   ChevronDown,
   ChevronUp,
@@ -125,6 +132,8 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   Minus,
   ArrowUpRight,
   ArrowRight,
+  ArrowDownToLine,
+  Download,
   ExternalLink,
 
   // Navigation & actions
@@ -135,6 +144,7 @@ const ICON_MAP: Record<string, React.ComponentType<any>> = {
   Layers,
   Globe,
   Zap,
+  Feather,
   Copy,
   Pencil,
   Trash2,

@@ -56,6 +56,7 @@ export async function enhancePromptStream(
           variables: request.variables,
           apply_style: request.apply_style,
           style_profile_id: request.style_profile_id,
+          enhancement_level: request.enhancement_level,
         },
         rateLimitKey: 'enhance',
         timeout: 90_000,
@@ -212,6 +213,10 @@ export async function enhancePromptStream(
         originalAnalysis: origAnalysis,
         enhancedAnalysis: enhAnalysis,
         toolRecommendations: finalToolRecs,
+        versionNumber: doneData.version?.version_number ?? 1,
+        versionId: doneData.version?.id,
+        detectedLevel: doneData.detected_level || metaData?.detected_level || request.enhancement_level || 'standard',
+        levelReason: doneData.level_reason || metaData?.level_reason,
       };
 
       onProgress?.(100, 'COMPLETE', 'Prompt enhanced successfully');
@@ -297,6 +302,7 @@ export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSi
       variables: request.variables,
       apply_style: request.apply_style,
       style_profile_id: request.style_profile_id,
+      enhancement_level: request.enhancement_level,
       auto_save: false,
     },
     rateLimitKey: 'enhance',
@@ -378,6 +384,8 @@ export async function enhancePrompt(request: EnhanceApiRequest, signal?: AbortSi
       originalAnalysis: origAnalysis,
       enhancedAnalysis: enhAnalysis,
       toolRecommendations: toolRecs,
+      detectedLevel: (backendData as any).detected_level || request.enhancement_level || 'standard',
+      levelReason: (backendData as any).level_reason,
     };
 
     // Only cache once the real scores have resolved, so a timed-out fetch does
@@ -503,6 +511,8 @@ export async function reenhancePrompt(
           originalAnalysis: origAnalysis,
           enhancedAnalysis: enhAnalysis,
           toolRecommendations: toolRecs,
+          versionNumber: backendData.version_number ?? 2,
+          versionId: backendData.version_id,
         };
 
         historyCache.clear();
@@ -621,6 +631,8 @@ export async function reenhancePromptStream(
           originalAnalysis: origAnalysis,
           enhancedAnalysis: enhAnalysis,
           toolRecommendations: toolRecs,
+          versionNumber: doneData.version_number ?? 2,
+          versionId: doneData.version_id,
         };
 
         callbacks?.onProgress?.(100, 'COMPLETE', 'Re-enhanced successfully');

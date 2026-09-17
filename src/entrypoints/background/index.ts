@@ -81,6 +81,7 @@ export default defineBackground(() => {
           prompt: payload.prompt,
           mode: payload.mode,
           role: payload.role,
+          enhancement_level: payload.enhancementLevel && payload.enhancementLevel !== 'auto' ? payload.enhancementLevel : undefined,
           context: { platform: payload.platform },
         },
         {
@@ -121,6 +122,13 @@ export default defineBackground(() => {
           deletePrompt(result.promptId).catch(() => {});
         }
         throw new Error('Enhancement cancelled');
+      }
+
+      if (result?.promptId) {
+        try {
+          chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: result.promptId } }).catch(() => {});
+          chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+        } catch {}
       }
 
       return result;
@@ -182,6 +190,13 @@ export default defineBackground(() => {
       if (currentController.signal.aborted) {
         console.log('[AURE Background] Re-enhancement was aborted by user.');
         throw new Error('Re-enhancement cancelled');
+      }
+
+      if (result?.promptId) {
+        try {
+          chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: result.promptId } }).catch(() => {});
+          chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+        } catch {}
       }
 
       return result;

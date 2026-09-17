@@ -11,6 +11,7 @@ import { analyzePrompt, calculateImprovements } from '@/lib/analytics';
 import { formatPromptText } from '@/lib/formatter';
 import { FormattedPromptViewer } from '../common/FormattedPromptViewer';
 import { RoleIcon } from '../common/RoleIcon';
+import { EnhancementDepthControl } from '../common/EnhancementDepthControl';
 import { useTheme } from '@/hooks/useTheme';
 import { D, L } from '@/theme/tokens';
 
@@ -18,11 +19,18 @@ interface ComparisonPanelProps {
   adapter: SiteAdapter;
   onAccept: (text: string) => void;
   onReject: () => void;
+  basePrompt?: string;
+  baseLabel?: string;
+  targetLabel?: string;
 }
 
 export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
+  adapter,
   onAccept,
   onReject,
+  basePrompt,
+  baseLabel,
+  targetLabel,
 }) => {
   const { isDark } = useTheme();
   const {
@@ -33,6 +41,8 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
     setShowRecommendation,
     streamingText,
     streamProgress,
+    enhancementLevel,
+    setEnhancementLevel,
   } = useEnhanceStore();
 
   const isStreaming = flowState === 'enhancing';
@@ -53,10 +63,13 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
   const shouldRender = isStreaming || !!enhanceResult || !!streamingText;
   if (!shouldRender) return null;
 
-  const originalPrompt = enhanceResult?.originalPrompt || currentPrompt || '';
-  const rawEnhancedPrompt = enhanceResult?.enhancedPrompt || streamingText || '';
+  const originalPrompt = basePrompt || enhanceResult?.originalPrompt || currentPrompt || '';
+  const rawEnhancedPrompt = isStreaming ? streamingText : (enhanceResult?.enhancedPrompt || streamingText || '');
   const enhancedPrompt = enhanceResult ? formatPromptText(rawEnhancedPrompt) : rawEnhancedPrompt;
   const finalText = isEditing ? editedText : enhancedPrompt;
+
+  const leftLabel = baseLabel || 'Original';
+  const rightLabel = targetLabel || (baseLabel ? 'Re-enhanced' : 'Enhanced');
 
   const diffResult = useMemo(
     () => (!isStreaming && enhanceResult ? diffWords(originalPrompt, enhancedPrompt) : []),
@@ -72,6 +85,9 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
     () => (originalAnalytics && enhancedAnalytics ? calculateImprovements(originalAnalytics, enhancedAnalytics) : null),
     [originalAnalytics, enhancedAnalytics]
   );
+
+  const detectedDepth = enhanceResult?.detectedLevel;
+  const activeDepth = detectedDepth || (enhancementLevel !== 'auto' ? enhancementLevel : undefined);
 
   const handleCopy = async (text: string, side: 'original' | 'enhanced') => {
     await navigator.clipboard.writeText(text);
@@ -130,11 +146,39 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 <RoleIcon name="Sparkles" size={16} strokeWidth={2} />
               </div>
               <div>
-                <h2 className="text-[15px] font-bold" style={{ color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.02em' }}>
-                  Prompt Comparison
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-[15px] font-bold" style={{ color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.02em' }}>
+                    {baseLabel ? 'Prompt Re-enhancement' : 'Prompt Comparison'}
+                  </h2>
+                  {activeDepth && (
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                        color: isDark ? '#C084FC' : '#7C3AED',
+                        background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#EDE9FE',
+                        border: `1px solid ${isDark ? 'rgba(167, 139, 250, 0.3)' : 'rgba(124, 58, 237, 0.2)'}`,
+                        padding: '1.5px 7px',
+                        borderRadius: 9999,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 3.5,
+                      }}
+                      title={enhanceResult?.levelReason ? `Depth: ${enhanceResult.levelReason}` : undefined}
+                    >
+                      <RoleIcon
+                        name={activeDepth === 'minimal' ? 'Feather' : activeDepth === 'deep' ? 'Layers' : activeDepth === 'auto' ? 'Zap' : 'Sparkles'}
+                        size={10.5}
+                        strokeWidth={2.2}
+                      />
+                      <span>{activeDepth}</span>
+                    </span>
+                  )}
+                </div>
                 <p className="text-[12px]" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>
-                  Review the enhancement before applying
+                  {baseLabel ? 'Review the re-enhanced prompt before applying' : 'Review the enhancement before applying'}
                 </p>
               </div>
             </div>
@@ -152,7 +196,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
           {/* Comparison Area */}
           <div className="flex-1 overflow-auto p-6 pe-scrollbar" style={{ background: isDark ? D.bg : '#FAFAFE' }}>
             <div className="grid grid-cols-2 gap-4 mb-5">
-              {/* Original */}
+              {/* Original / Existing */}
               <div
                 className="rounded-xl overflow-hidden flex flex-col"
                 style={{
@@ -164,7 +208,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                   className="px-4 py-2.5 flex items-center justify-between flex-shrink-0"
                   style={{ borderBottom: isDark ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid #ECE9FF' }}
                 >
-                  <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>Original</span>
+                  <span className="text-[12px] font-semibold" style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}>{leftLabel}</span>
                   <div className="flex items-center gap-2">
                     <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#c4c4d4' }}>
                       {originalAnalytics.wordCount}w · {originalAnalytics.tokenCount}t
@@ -186,7 +230,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 </div>
               </div>
 
-              {/* Enhanced */}
+              {/* Enhanced / Re-enhanced */}
               <div
                 className="rounded-xl overflow-hidden flex flex-col"
                 style={{
@@ -199,7 +243,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                   style={{ borderBottom: isDark ? '1px solid rgba(124, 92, 252, 0.2)' : '1px solid #A78BFA30' }}
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-[12px] font-semibold" style={{ color: isDark ? '#A78BFA' : '#7C5CFC' }}>Enhanced</span>
+                    <span className="text-[12px] font-semibold" style={{ color: isDark ? '#A78BFA' : '#7C5CFC' }}>{rightLabel}</span>
                     {isStreaming && (
                       <span
                         style={{
@@ -258,7 +302,7 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                       </div>
                       <div className="text-center">
                         <p className="text-[13px] font-semibold mb-1" style={{ color: isDark ? D.textPrimary : '#1a1a2e' }}>
-                          AI is enhancing your prompt…
+                          {baseLabel ? 'AI is re-enhancing your prompt…' : 'AI is enhancing your prompt…'}
                         </p>
                         <p className="text-[11px]" style={{ color: isDark ? D.textMuted : '#94A3B8' }}>
                           {streamProgress > 0
@@ -652,6 +696,19 @@ export const ComparisonPanel: React.FC<ComparisonPanelProps> = ({
                 </button>
               )}
             </div>
+
+            {/* Center: Compact Enhancement Depth Selector */}
+            <div style={{ maxWidth: 280, flex: 1, margin: '0 12px' }}>
+              <EnhancementDepthControl
+                value={enhancementLevel}
+                onChange={setEnhancementLevel}
+                showTitle={false}
+                compact={true}
+                layoutIdPrefix="comparePanelDepth"
+                disabled={isStreaming}
+              />
+            </div>
+
             <div className="flex gap-2">
               <button
                 onClick={onReject}

@@ -6,6 +6,7 @@ import { create } from 'zustand';
 import type {
   EnhanceFlowState,
   EnhancementMode,
+  EnhancementLevel,
   EnhanceResult,
 } from '@/types/enhancement';
 import type { ModelRecommendation } from '@/types/messages';
@@ -28,6 +29,10 @@ interface EnhanceState {
 
   selectedRoleMode: string;
   setSelectedRoleMode: (mode: string) => void;
+
+  // Enhancement depth level ('auto' | 'minimal' | 'standard' | 'deep')
+  enhancementLevel: EnhancementLevel;
+  setEnhancementLevel: (level: EnhancementLevel) => void;
 
   // Enhancement result
   enhanceResult: EnhanceResult | null;
@@ -84,6 +89,9 @@ export const useEnhanceStore = create<EnhanceState>((set) => ({
 
   selectedRoleMode: '',
   setSelectedRoleMode: (selectedRoleMode) => set({ selectedRoleMode }),
+
+  enhancementLevel: 'auto',
+  setEnhancementLevel: (enhancementLevel) => set({ enhancementLevel }),
 
   enhanceResult: null,
   setEnhanceResult: (enhanceResult) => set({ enhanceResult }),

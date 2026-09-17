@@ -8,6 +8,8 @@ import { sendMessage } from '@/lib/messaging';
 import type { Prompt, PromptHistoryFilters } from '@/types/prompt';
 import { MODE_MAP } from '@/constants/modes';
 import { RoleIcon } from '../common/RoleIcon';
+import { ExportContextModal } from '../sidepanel/ExportContextModal';
+import type { MultiChatExportItem } from '@/lib/export-context';
 
 export const PromptHistory: React.FC = () => {
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -16,6 +18,30 @@ export const PromptHistory: React.FC = () => {
   const [timeFilter, setTimeFilter] = useState<PromptHistoryFilters['timeRange']>('all');
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+
+  const exportablePrompts: MultiChatExportItem[] = React.useMemo(() => {
+    return prompts.map((p) => ({
+      id: p.id,
+      title: p.title || p.originalText.slice(0, 50),
+      originalPrompt: p.originalText,
+      mode: p.mode,
+      category: p.category,
+      targetModel: p.aiModel,
+      score: p.analysisData?.afterScore ?? p.successScore,
+      createdAt: p.createdAt,
+      optimizedPrompt: p.enhancedText,
+      versions: p.enhancedText
+        ? [
+            {
+              versionNumber: p.versionNumber || 1,
+              optimizedPrompt: p.enhancedText,
+              overallScore: p.analysisData?.afterScore ?? p.successScore,
+            },
+          ]
+        : undefined,
+    }));
+  }, [prompts]);
 
   const handleDeletePrompt = async (promptId: string) => {
     setIsDeletingId(promptId);
@@ -108,23 +134,35 @@ export const PromptHistory: React.FC = () => {
         />
       </div>
 
-      {/* Filter chips */}
-      <div className="px-4 pb-2 flex gap-1.5 overflow-x-auto">
-        {(['all', 'today', 'week', 'month'] as const).map((filter) => (
-          <button
-            key={filter}
-            onClick={() => setTimeFilter(filter)}
-            className={`
-              px-2.5 py-1 text-[10px] font-medium rounded-full whitespace-nowrap transition-colors
-              ${timeFilter === filter
-                ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
-                : 'bg-white text-slate-500 hover:text-slate-600 border border-slate-200/60'
-              }
-            `}
-          >
-            {filter === 'all' ? 'All Time' : filter.charAt(0).toUpperCase() + filter.slice(1)}
-          </button>
-        ))}
+      {/* Filter chips & Export button */}
+      <div className="px-4 pb-2 flex items-center justify-between gap-1.5 overflow-x-auto">
+        <div className="flex gap-1.5 overflow-x-auto">
+          {(['all', 'today', 'week', 'month'] as const).map((filter) => (
+            <button
+              key={filter}
+              onClick={() => setTimeFilter(filter)}
+              className={`
+                px-2.5 py-1 text-[10px] font-medium rounded-full whitespace-nowrap transition-colors cursor-pointer
+                ${timeFilter === filter
+                  ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                  : 'bg-white text-slate-500 hover:text-slate-600 border border-slate-200/60'
+                }
+              `}
+            >
+              {filter === 'all' ? 'All Time' : filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </button>
+          ))}
+        </div>
+
+        <button
+          id="popup-export-contexts-btn"
+          onClick={() => setIsExportModalOpen(true)}
+          title="Export prompt contexts"
+          className="flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-full whitespace-nowrap transition-colors cursor-pointer border border-purple-200 text-purple-600 bg-purple-50 hover:bg-purple-100 shrink-0 ml-auto"
+        >
+          <RoleIcon name="Download" size={11} strokeWidth={2.2} />
+          <span>Export</span>
+        </button>
       </div>
 
       {/* History List */}
@@ -193,6 +231,14 @@ export const PromptHistory: React.FC = () => {
                             <span className="text-[10px] text-slate-900/10">•</span>
                             <span className="text-[10px] text-emerald-600 font-semibold">
                               {prompt.successScore}%
+                            </span>
+                          </>
+                        )}
+                        {prompt.versionNumber && prompt.versionNumber > 1 && (
+                          <>
+                            <span className="text-[10px] text-slate-900/10">•</span>
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-600 border border-emerald-200">
+                              v{prompt.versionNumber}
                             </span>
                           </>
                         )}
@@ -268,6 +314,13 @@ export const PromptHistory: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Export Context Modal */}
+      <ExportContextModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        availablePrompts={exportablePrompts}
+      />
     </div>
   );
 };

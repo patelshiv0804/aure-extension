@@ -43,6 +43,7 @@ export interface Prompt {
   successScore?: number;
   analysisData?: PromptAnalysisData;
   tags?: string[];
+  versionNumber?: number;
 }
 
 export interface PromptVersion {

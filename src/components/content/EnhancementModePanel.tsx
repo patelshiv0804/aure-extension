@@ -9,6 +9,7 @@ import { useEnhanceStore } from '@/stores/enhance.store';
 import { ROLES, ROLE_MODES, getModeIconName } from '@/constants/modes';
 import type { EnhancementMode } from '@/types/enhancement';
 import { RoleIcon } from '../common/RoleIcon';
+import { EnhancementDepthControl } from '../common/EnhancementDepthControl';
 import { useTheme } from '@/hooks/useTheme';
 
 interface EnhancementModePanelProps {
@@ -28,6 +29,8 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
     setSelectedRole,
     selectedRoleMode,
     setSelectedRoleMode,
+    enhancementLevel,
+    setEnhancementLevel,
     reset,
   } = useEnhanceStore();
 
@@ -428,9 +431,17 @@ export const EnhancementModePanel: React.FC<EnhancementModePanelProps> = ({
             flexShrink: 0,
             display: 'flex',
             flexDirection: 'column',
-            gap: 10,
+            gap: 12,
           }}
         >
+          {/* Enhancement Depth Segmented Control */}
+          <EnhancementDepthControl
+            value={enhancementLevel}
+            onChange={setEnhancementLevel}
+            disabled={isSubmitting || flowState === 'enhancing'}
+            layoutIdPrefix="modePanelDepth"
+          />
+
           {/* Prominent Enhance Button */}
           <button
             onClick={handleEnhanceClick}

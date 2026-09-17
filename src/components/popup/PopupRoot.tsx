@@ -38,8 +38,14 @@ export const PopupRoot: React.FC = () => {
     fetchRecent();
   }, [isAuthenticated]);
 
-  const handleOpenSidePanel = async () => {
+  const handleOpenSidePanel = async (tabName?: string | React.MouseEvent) => {
     try {
+      const validTabs = ['history', 'analytics', 'context', 'settings'];
+      if (typeof tabName === 'string' && validTabs.includes(tabName)) {
+        if (typeof chrome !== 'undefined' && chrome.storage?.local) {
+          await chrome.storage.local.set({ targetSidePanelTab: tabName });
+        }
+      }
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (tab?.windowId) {
         await chrome.sidePanel.open({ windowId: tab.windowId });
@@ -193,21 +199,21 @@ export const PopupRoot: React.FC = () => {
           ) : (
             <button
               onClick={handleOpenSidePanel}
-              className="px-3 py-1 rounded-full text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
-              style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)' }}
+              className="px-3 py-1 rounded-full text-white text-xs font-semibold shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0 hover:opacity-90"
+              style={{ background: '#7C3AED' }}
             >
               Sign In
             </button>
           )}
 
           <button
-            onClick={handleOpenSidePanel}
+            onClick={() => handleOpenSidePanel('settings')}
             className="w-7 h-7 rounded-full flex items-center justify-center transition-all cursor-pointer shrink-0"
             style={{
               color: isDark ? D.textSecondary : '#64748B',
               background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
             }}
-            title="Open Workspace"
+            title="Settings"
           >
             <RoleIcon name="Settings" size={14} strokeWidth={1.8} />
           </button>
@@ -215,16 +221,16 @@ export const PopupRoot: React.FC = () => {
       </div>
 
       {/* ── Recent Prompt Glass Card ────────────────────────── */}
-      <div className="px-5 py-2.5">
+      <div className="px-4 py-2">
         <div
           onClick={handleOpenSidePanel}
-          className="rounded-2xl p-4 transition-all duration-200 cursor-pointer group"
+          className="rounded-xl p-3 transition-all duration-150 cursor-pointer group"
           style={{
             background: isDark ? D.surface : '#FFFFFF',
             border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
             boxShadow: isDark
-              ? '0 4px 20px rgba(0, 0, 0, 0.35)'
-              : '0 2px 10px rgba(124, 58, 237, 0.04)',
+              ? '0 2px 10px rgba(0, 0, 0, 0.25)'
+              : '0 1px 4px rgba(124, 58, 237, 0.04)',
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = '#8B5CF6';
@@ -235,9 +241,9 @@ export const PopupRoot: React.FC = () => {
         >
           {recentPrompt ? (
             <div>
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center justify-between mb-1">
                 <span
-                  className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-md"
+                  className="text-[9.5px] font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded-md"
                   style={{
                     background: isDark ? 'rgba(139, 92, 246, 0.2)' : '#F5F3FF',
                     color: isDark ? '#C084FC' : '#7C3AED',
@@ -246,33 +252,32 @@ export const PopupRoot: React.FC = () => {
                 >
                   Recent Prompt
                 </span>
-                <span className="text-[11px] font-medium" style={{ color: isDark ? D.textMuted : '#94A3B8' }}>
+                <span className="text-[10px]" style={{ color: isDark ? D.textMuted : '#94A3B8' }}>
                   {formatTime(recentPrompt.createdAt)}
                 </span>
               </div>
               <p
-                className="text-xs font-semibold line-clamp-2 leading-relaxed transition-colors"
-                style={{ color: isDark ? D.textPrimary : '#0F172A' }}
+                className="text-[12px] font-medium line-clamp-2 leading-snug transition-colors"
+                style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}
               >
                 {recentPrompt.title || recentPrompt.originalText}
               </p>
             </div>
           ) : (
-            <div className="flex flex-col items-center text-center py-2">
+            <div className="text-center py-2 flex flex-col items-center">
               <div
-                className="w-10 h-10 rounded-2xl flex items-center justify-center mb-2.5 shadow-2xs group-hover:scale-105 transition-transform"
+                className="w-8 h-8 rounded-xl flex items-center justify-center mb-1.5"
                 style={{
-                  background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#F5F3FF',
+                  background: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F5F3FF',
                   color: isDark ? '#C084FC' : '#7C3AED',
-                  border: `1px solid ${isDark ? 'rgba(167, 139, 250, 0.25)' : 'rgba(124, 58, 237, 0.15)'}`,
                 }}
               >
-                <Sparkles size={18} />
+                <Sparkles size={16} />
               </div>
-              <h3 className="text-xs font-bold mb-1" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
+              <h3 className="text-[11.5px] font-semibold mb-0.5" style={{ color: isDark ? D.textPrimary : '#0F172A' }}>
                 No prompts enhanced yet
               </h3>
-              <p className="text-[11px] leading-relaxed max-w-[240px]" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
+              <p className="text-[10.5px] leading-relaxed max-w-[220px]" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
                 Navigate to ChatGPT, Claude, or Gemini to start enhancing your prompts.
               </p>
             </div>
@@ -281,25 +286,25 @@ export const PopupRoot: React.FC = () => {
       </div>
 
       {/* ── Quick Actions Grid ──────────────────────────────── */}
-      <div className="px-5 py-2.5">
-        <div className="grid grid-cols-4 gap-2">
+      <div className="px-4 py-1.5">
+        <div className="grid grid-cols-4 gap-1.5">
           {[
-            { icon: 'Clock', label: 'History', action: handleOpenSidePanel },
-            { icon: 'Layers', label: 'Versions', action: handleOpenSidePanel },
-            { icon: 'BarChart3', label: 'Analytics', action: handleOpenSidePanel },
-            { icon: 'Settings', label: 'Settings', action: handleOpenSidePanel },
+            { icon: 'Clock', label: 'History', action: () => handleOpenSidePanel('history') },
+            { icon: 'BarChart3', label: 'Analytics', action: () => handleOpenSidePanel('analytics') },
+            { icon: 'Download', label: 'Context', action: () => handleOpenSidePanel('context') },
+            { icon: 'Settings', label: 'Settings', action: () => handleOpenSidePanel('settings') },
           ].map((item) => (
             <motion.button
               key={item.label}
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               transition={{ type: 'spring', stiffness: 400, damping: 25 }}
               onClick={item.action}
-              className="flex flex-col items-center gap-1.5 p-2.5 rounded-2xl transition-all cursor-pointer group"
+              className="flex flex-col items-center gap-1 p-2 rounded-xl transition-all cursor-pointer group"
               style={{
                 background: isDark ? D.surface : '#FFFFFF',
                 border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
-                boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 1px 4px rgba(124, 58, 237, 0.04)',
+                boxShadow: isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 3px rgba(124, 58, 237, 0.03)',
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = '#8B5CF6';
@@ -309,16 +314,16 @@ export const PopupRoot: React.FC = () => {
               }}
             >
               <div
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-colors"
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-colors"
                 style={{
                   background: isDark ? D.surface2 : '#F8FAFC',
                   color: isDark ? '#C084FC' : '#7C3AED',
                 }}
               >
-                <RoleIcon name={item.icon} size={15} strokeWidth={1.8} />
+                <RoleIcon name={item.icon} size={14} strokeWidth={1.8} />
               </div>
               <span
-                className="text-[11px] font-semibold transition-colors"
+                className="text-[10px] font-medium transition-colors"
                 style={{ color: isDark ? D.textSecondary : '#475569' }}
               >
                 {item.label}

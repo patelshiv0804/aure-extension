@@ -248,6 +248,7 @@ export async function getPromptHistory(
             ],
           },
           tags: [category, mode].filter(Boolean),
+          versionNumber: p.current_version?.version_number ?? 1,
         };
       }).filter((p) => {
         if (filters.timeRange && filters.timeRange !== 'all') {

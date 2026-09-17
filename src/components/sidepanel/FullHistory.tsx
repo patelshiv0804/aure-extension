@@ -2,8 +2,9 @@
 // FullHistory — Premium side panel history view
 // ──────────────────────────────────────────────────────────────
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, Award, Medal, Sparkles } from 'lucide-react';
 import { sendMessage } from '@/lib/messaging';
 import { useAuthStore } from '@/stores/auth.store';
 import { VersionTimeline } from '@/components/popup/VersionTimeline';
@@ -11,7 +12,6 @@ import type { Prompt, PromptHistoryFilters } from '@/types/prompt';
 import { MODE_MAP } from '@/constants/modes';
 import { RoleIcon } from '../common/RoleIcon';
 import { useTheme } from '@/hooks/useTheme';
-
 interface FullHistoryProps {
   onSignIn?: () => void;
 }
@@ -26,6 +26,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
   const [isDeletingId, setIsDeletingId] = useState<string | null>(null);
   const { isAuthenticated, loadAuth } = useAuthStore();
   const { isDark, D, L } = useTheme();
+
 
   const handleDeletePrompt = async (promptId: string) => {
     setIsDeletingId(promptId);
@@ -114,57 +115,60 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
   ];
 
   return (
-    <div className="p-5 space-y-4">
+    <div className="p-3.5 space-y-2.5">
       {/* Search */}
       <div className="relative">
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
-          <RoleIcon name="Search" size={15} strokeWidth={1.75} />
+        <div className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
+          <RoleIcon name="Search" size={13.5} strokeWidth={1.8} />
         </div>
         <input
           type="text"
           placeholder="Search prompts..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 rounded-xl text-[13px] outline-none transition-all duration-200"
+          className="w-full pl-8 pr-3 py-1.5 rounded-lg text-[12px] outline-none transition-all duration-150"
           style={{
             background: isDark ? D.surface : '#FFFFFF',
             border: `1px solid ${isDark ? D.border : '#ECE9FF'}`,
             color: isDark ? D.textPrimary : '#1a1a2e',
           }}
-          onFocus={e => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(124, 92, 252, 0.12)'; }}
+          onFocus={e => { e.currentTarget.style.borderColor = '#8B5CF6'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(124, 92, 252, 0.12)'; }}
           onBlur={e => { e.currentTarget.style.borderColor = isDark ? (D.border as string) : '#ECE9FF'; e.currentTarget.style.boxShadow = 'none'; }}
         />
       </div>
 
-      {/* Filter Pills */}
-      <div className="flex gap-1.5">
-        {filters.map((f) => {
-          const isSelected = timeFilter === f.value;
-          return (
-            <button
-              key={f.value}
-              onClick={() => setTimeFilter(f.value)}
-              className="transition-all duration-200 cursor-pointer"
-              style={{
-                padding: '5px 14px',
-                borderRadius: 20,
-                fontSize: 12,
-                fontWeight: isSelected ? 600 : 500,
-                border: 'none',
-                background: isSelected
-                  ? 'linear-gradient(135deg, #7C3AED, #9333EA)'
-                  : isDark ? 'rgba(255, 255, 255, 0.06)' : 'transparent',
-                color: isSelected ? '#FFFFFF' : (isDark ? D.textSecondary : '#8E8EA0'),
-                boxShadow: isSelected
-                  ? '0 2px 8px rgba(124, 58, 237, 0.25)'
-                  : `0 0 0 1px ${isDark ? D.border : '#ECE9FF'} inset`,
-              }}
-            >
-              {f.label}
-            </button>
-          );
-        })}
+      {/* Filter Pills & Vault Action Buttons */}
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap">
+          {filters.map((f) => {
+            const isSelected = timeFilter === f.value;
+            return (
+              <button
+                key={f.value}
+                onClick={() => setTimeFilter(f.value)}
+                className="transition-all duration-150 cursor-pointer"
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 8,
+                  fontSize: 11,
+                  fontWeight: isSelected ? 600 : 500,
+                  border: 'none',
+                  background: isSelected
+                    ? (isDark ? '#8B5CF6' : '#7C3AED')
+                    : isDark ? 'rgba(255, 255, 255, 0.05)' : '#F1F5F9',
+                  color: isSelected ? '#FFFFFF' : (isDark ? D.textSecondary : '#64748B'),
+                }}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+
       </div>
+
+
 
       {/* Results */}
       {!isAuthenticated ? (
@@ -194,8 +198,8 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
           </div>
           <button
             onClick={() => onSignIn?.()}
-            className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-sm transition-all cursor-pointer"
-            style={{ background: 'linear-gradient(135deg, #7C3AED 0%, #9333EA 100%)' }}
+            className="mt-1 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-sm transition-all cursor-pointer hover:opacity-90"
+            style={{ background: '#7C3AED' }}
           >
             Sign In to AURE
           </button>
@@ -253,16 +257,18 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
               >
                 <div
                   onClick={() => setSelectedPromptId(isSelected ? null : prompt.id)}
-                  className="rounded-xl transition-all duration-200 cursor-pointer"
+                  className="rounded-xl transition-all duration-150 cursor-pointer"
                   style={{
-                    padding: '14px 16px',
+                    padding: '10px 12px',
                     background: isSelected
                       ? isDark ? 'rgba(139, 92, 246, 0.16)' : '#F5F3FF'
                       : isDark ? D.surface : '#FFFFFF',
-                    border: `1px solid ${isSelected ? '#8B5CF6' : (isDark ? D.border : '#ECE9FF')}`,
+                    border: `1px solid ${
+                      isSelected ? '#8B5CF6' : (isDark ? D.border : '#ECE9FF')
+                    }`,
                     boxShadow: isSelected
-                      ? '0 2px 10px rgba(124, 58, 237, 0.15)'
-                      : isDark ? '0 2px 6px rgba(0,0,0,0.25)' : '0 1px 3px rgba(0,0,0,0.02)',
+                      ? '0 2px 8px rgba(124, 58, 237, 0.12)'
+                      : isDark ? '0 1px 4px rgba(0,0,0,0.2)' : '0 1px 2px rgba(0,0,0,0.02)',
                   }}
                   onMouseEnter={e => {
                     if (!isSelected) {
@@ -277,73 +283,85 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                     }
                   }}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2.5">
                     <div className="flex-1 min-w-0">
                       <h3
-                        className="text-[13.5px] font-semibold line-clamp-1"
-                        style={{ color: isDark ? D.textPrimary : '#1a1a2e', letterSpacing: '-0.01em' }}
+                        className="text-[12.5px] font-medium line-clamp-1 leading-snug"
+                        style={{ color: isDark ? '#F1F5F9' : '#0F172A' }}
                       >
                         {prompt.title || prompt.originalText.slice(0, 60)}
                       </h3>
                       <p
-                        className="text-[12px] line-clamp-1 mt-1"
-                        style={{ color: isDark ? D.textSecondary : '#8E8EA0' }}
+                        className="text-[11px] line-clamp-1 mt-0.5 leading-normal"
+                        style={{ color: isDark ? D.textSecondary : '#64748B' }}
                       >
                         {prompt.originalText}
                       </p>
 
-                      <div className="flex items-center gap-2.5 mt-2.5">
+                      <div className="flex items-center gap-2 mt-2">
                         {modeConfig && (
                           <span
-                            className="text-[11px] font-medium flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg"
+                            className="text-[10px] font-medium flex items-center gap-1 px-1.5 py-0.5 rounded-md"
                             style={{
-                              background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#F5F3FF',
-                              border: `1px solid ${isDark ? 'rgba(167, 139, 250, 0.25)' : '#ECE9FF'}`,
+                              background: isDark ? 'rgba(139, 92, 246, 0.15)' : '#F5F3FF',
+                              border: `1px solid ${isDark ? 'rgba(167, 139, 250, 0.2)' : '#ECE9FF'}`,
                               color: isDark ? '#C084FC' : '#7C3AED',
                             }}
                           >
-                            <RoleIcon name={modeConfig.icon} size={11} />
+                            <RoleIcon name={modeConfig.icon} size={10} />
                             {modeConfig.label}
+                          </span>
+                        )}
+                        {prompt.versionNumber && prompt.versionNumber > 1 && (
+                          <span
+                            className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md flex items-center gap-0.5"
+                            style={{
+                              background: isDark ? 'rgba(16, 185, 129, 0.15)' : '#ECFDF5',
+                              color: isDark ? '#34D399' : '#059669',
+                              border: `1px solid ${isDark ? 'rgba(52, 211, 153, 0.25)' : '#A7F3D0'}`,
+                            }}
+                            title={`Re-enhanced to Version ${prompt.versionNumber}`}
+                          >
+                            <span>v{prompt.versionNumber}</span>
                           </span>
                         )}
                         {prompt.platform && prompt.platform.toLowerCase() !== 'promptiq' && (
                           <>
-                            <span className="text-[11px] font-medium" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
+                            <span className="text-[10px] font-medium" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
                               {prompt.platform}
                             </span>
-                            <span className="text-[10px]" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#C4C4D4' }}>•</span>
+                            <span className="text-[9px]" style={{ color: isDark ? 'rgba(255,255,255,0.2)' : '#C4C4D4' }}>•</span>
                           </>
                         )}
-                        <span className="text-[11px]" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
+                        <span className="text-[10px]" style={{ color: isDark ? D.textMuted : '#8E8EA0' }}>
                           {new Date(prompt.createdAt).toLocaleDateString()}
                         </span>
                       </div>
                     </div>
 
                     {/* Right side: Score Comparison Badge, Delete Button & Toggle */}
-                    <div className="flex flex-col items-end gap-1.5 shrink-0">
-                      <div className="flex items-center gap-1.5">
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <div className="flex items-center gap-1">
                         <div
-                          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl shadow-2xs"
+                          className="flex items-center gap-1 px-2 py-0.5 rounded-lg"
                           style={{
                             background: isDark ? D.surface2 : '#F8FAFC',
                             border: `1px solid ${isDark ? D.border : '#E2E8F0'}`,
                           }}
                         >
-                          <span className="text-[11px] font-semibold" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
+                          <span className="text-[10.5px] font-medium" style={{ color: isDark ? D.textSecondary : '#64748B' }}>
                             {beforeScore}
                           </span>
-                          <RoleIcon name="ArrowRight" size={10} className="text-slate-400" />
-                          <span className="text-xs font-bold" style={{ color: isDark ? '#C084FC' : '#7C3AED' }}>
+                          <RoleIcon name="ArrowRight" size={9} className="text-slate-400" />
+                          <span className="text-[11px] font-bold" style={{ color: isDark ? '#C084FC' : '#7C3AED' }}>
                             {afterScore}
                           </span>
                           {diffScore > 0 && (
                             <span
-                              className="text-[10px] font-bold px-1.5 py-0.2 rounded-full"
+                              className="text-[9.5px] font-bold px-1 py-0.2 rounded-full"
                               style={{
                                 background: isDark ? 'rgba(52, 211, 153, 0.2)' : '#ECFDF5',
                                 color: isDark ? '#34D399' : '#059669',
-                                border: `1px solid ${isDark ? 'rgba(52, 211, 153, 0.3)' : '#A7F3D0'}`,
                               }}
                             >
                               +{diffScore}
@@ -358,7 +376,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                             setDeleteConfirmId(prompt.id);
                           }}
                           title="Permanently Delete Prompt"
-                          className="p-1.5 rounded-xl transition-all cursor-pointer"
+                          className="p-1 rounded-lg transition-all cursor-pointer"
                           style={{
                             color: isDark ? D.textMuted : '#94A3B8',
                           }}
@@ -371,13 +389,13 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                             e.currentTarget.style.background = 'transparent';
                           }}
                         >
-                          <RoleIcon name="Trash2" size={14} />
+                          <RoleIcon name="Trash2" size={13} />
                         </button>
                       </div>
 
-                      <div style={{ color: isDark ? D.textMuted : '#C4C4D4' }} className="flex items-center gap-1 text-[11px]">
+                      <div style={{ color: isDark ? D.textMuted : '#C4C4D4' }} className="flex items-center gap-0.5 text-[10px]">
                         <span>{isSelected ? 'Less' : 'Details'}</span>
-                        <RoleIcon name={isSelected ? 'ChevronDown' : 'ChevronRight'} size={14} />
+                        <RoleIcon name={isSelected ? 'ChevronDown' : 'ChevronRight'} size={12} />
                       </div>
                     </div>
                   </div>
@@ -412,47 +430,47 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                         <div className="flex items-center gap-2 mb-3">
                           <div
                             style={{
-                              width: 28,
-                              height: 28,
-                              borderRadius: 8,
-                              background: 'linear-gradient(135deg, #7C3AED, #5B21B6)',
+                              width: 24,
+                              height: 24,
+                              borderRadius: 6,
+                              background: '#7C3AED',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
-                              boxShadow: '0 2px 8px rgba(124, 58, 237, 0.4)',
+                              boxShadow: '0 2px 6px rgba(124, 58, 237, 0.35)',
                               flexShrink: 0,
                             }}
                           >
-                            <span style={{ fontSize: 14 }}>✨</span>
+                            <Sparkles size={13} className="text-white" strokeWidth={2.2} />
                           </div>
                           <div>
-                            <p style={{ fontSize: 11, fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>
+                            <p style={{ fontSize: 10, fontWeight: 700, color: '#A78BFA', textTransform: 'uppercase', letterSpacing: '0.08em', margin: 0 }}>
                               Best AI For This Prompt
                             </p>
-                            <p style={{ fontSize: 10, color: '#A5B4FC', margin: 0 }}>Click to open in browser</p>
+                            <p style={{ fontSize: 9.5, color: '#94A3B8', margin: 0 }}>Click to open in browser</p>
                           </div>
                         </div>
 
                         {/* Ranked Cards */}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
                           {recommendations.map((rec) => {
-                            const rankConfig: Record<number, { badge: string; accent: string; glowColor: string; label: string; rankBg: string }> = {
+                            const rankConfig: Record<number, { Icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>; accent: string; glowColor: string; label: string; rankBg: string }> = {
                               1: {
-                                badge: '🥇',
+                                Icon: Trophy,
                                 accent: '#F59E0B',
                                 glowColor: 'rgba(245,158,11,0.15)',
                                 label: 'Best Match',
                                 rankBg: 'rgba(245,158,11,0.15)',
                               },
                               2: {
-                                badge: '🥈',
+                                Icon: Award,
                                 accent: '#94A3B8',
                                 glowColor: 'rgba(148,163,184,0.1)',
                                 label: '2nd Choice',
                                 rankBg: 'rgba(148,163,184,0.15)',
                               },
                               3: {
-                                badge: '🥉',
+                                Icon: Medal,
                                 accent: '#CD7C4A',
                                 glowColor: 'rgba(205,124,74,0.12)',
                                 label: '3rd Choice',
@@ -460,6 +478,7 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                               },
                             };
                             const cfg = rankConfig[rec.rank] ?? rankConfig[3];
+                            const RankIcon = cfg.Icon;
                             return (
                               <a
                                 key={rec.name}
@@ -471,55 +490,69 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
-                                  gap: 10,
-                                  padding: '9px 12px',
-                                  borderRadius: 12,
-                                  background: `rgba(255,255,255,0.05)`,
-                                  border: `1px solid rgba(255,255,255,0.08)`,
+                                  gap: 8,
+                                  padding: '7px 10px',
+                                  borderRadius: 10,
+                                  background: `rgba(255,255,255,0.04)`,
+                                  border: `1px solid rgba(255,255,255,0.07)`,
                                   textDecoration: 'none',
                                   cursor: 'pointer',
                                   transition: 'background 0.15s ease, transform 0.15s ease',
                                 }}
                                 onMouseEnter={(e) => {
-                                  e.currentTarget.style.background = `rgba(124,92,252,0.15)`;
+                                  e.currentTarget.style.background = `rgba(124,92,252,0.12)`;
                                   e.currentTarget.style.transform = 'translateY(-1px)';
-                                  e.currentTarget.style.border = '1px solid rgba(139, 92, 246, 0.4)';
+                                  e.currentTarget.style.border = '1px solid rgba(139, 92, 246, 0.35)';
                                 }}
                                 onMouseLeave={(e) => {
-                                  e.currentTarget.style.background = `rgba(255,255,255,0.05)`;
+                                  e.currentTarget.style.background = `rgba(255,255,255,0.04)`;
                                   e.currentTarget.style.transform = 'none';
-                                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.08)';
+                                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.07)';
                                 }}
                               >
-                                {/* Medal */}
-                                <span style={{ fontSize: 20, lineHeight: 1, flexShrink: 0 }}>{cfg.badge}</span>
+                                {/* Rank Icon */}
+                                <div
+                                  style={{
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: 6,
+                                    background: cfg.rankBg,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    color: cfg.accent,
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  <RankIcon size={13} strokeWidth={2.2} />
+                                </div>
 
                                 {/* Name & label */}
                                 <div style={{ flex: 1, minWidth: 0 }}>
-                                  <p style={{ margin: 0, fontSize: 12.5, fontWeight: 700, color: '#F1F5F9', letterSpacing: '-0.01em' }}>
+                                  <p style={{ margin: 0, fontSize: 11.5, fontWeight: 600, color: '#F1F5F9', letterSpacing: '-0.01em' }}>
                                     {rec.name}
                                   </p>
-                                  <p style={{ margin: 0, fontSize: 10, color: cfg.accent, fontWeight: 600 }}>
+                                  <p style={{ margin: 0, fontSize: 9.5, color: cfg.accent, fontWeight: 500 }}>
                                     {cfg.label}
                                   </p>
                                 </div>
 
                                 {/* Rank pill + link icon */}
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
                                   <span
                                     style={{
-                                      fontSize: 10,
-                                      fontWeight: 800,
+                                      fontSize: 9.5,
+                                      fontWeight: 700,
                                       color: cfg.accent,
                                       background: cfg.rankBg,
-                                      borderRadius: 6,
-                                      padding: '2px 7px',
+                                      borderRadius: 5,
+                                      padding: '1.5px 6px',
                                     }}
                                   >
                                     #{rec.rank}
                                   </span>
                                   <span style={{ color: 'rgba(255,255,255,0.3)', display: 'flex' }}>
-                                    <RoleIcon name="ExternalLink" size={11} />
+                                    <RoleIcon name="ExternalLink" size={10} />
                                   </span>
                                 </div>
                               </a>
@@ -625,6 +658,8 @@ export const FullHistory: React.FC<FullHistoryProps> = ({ onSignIn }) => {
           </motion.div>
         )}
       </AnimatePresence>
+
+
     </div>
   );
 };

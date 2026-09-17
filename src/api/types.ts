@@ -13,6 +13,7 @@ export interface EnhanceApiRequest {
   variables?: Record<string, string>;
   apply_style?: boolean;
   style_profile_id?: string;
+  enhancement_level?: string;
   context?: {
     platform?: string;
     previousPrompts?: string[];

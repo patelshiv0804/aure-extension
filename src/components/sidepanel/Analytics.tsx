@@ -17,6 +17,7 @@ interface AnalyticsProps {
   onNavigateHistory?: () => void;
 }
 
+
 interface StatCardProps {
   label: string;
   value: number | string;
@@ -24,8 +25,7 @@ interface StatCardProps {
   suffix?: string;
   icon: React.ComponentType<{ size?: number; strokeWidth?: number; className?: string }>;
   accent: string;
-  sub?: React.ReactNode;
-  sparkline?: boolean;
+  onClick?: () => void;
 }
 
 const StatCard: React.FC<StatCardProps> = ({
@@ -35,77 +35,56 @@ const StatCard: React.FC<StatCardProps> = ({
   suffix = '',
   icon: Icon,
   accent,
-  sub,
-  sparkline,
+  onClick,
 }) => {
   const { isDark, D } = useTheme();
 
   return (
     <motion.div
-      whileHover={{ y: -2 }}
-      transition={{ duration: 0.2 }}
-      className="rounded-2xl p-4 transition-all flex flex-col justify-between"
+      whileHover={{ y: -1.5 }}
+      transition={{ duration: 0.15 }}
+      onClick={onClick}
+      className={`rounded-xl px-1.5 py-2 transition-all flex flex-col items-center justify-between text-center select-none ${
+        onClick ? 'cursor-pointer' : ''
+      }`}
       style={{
         background: isDark ? 'rgba(20, 19, 32, 0.85)' : '#FFFFFF',
-        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(124, 58, 237, 0.10)'}`,
+        border: `1px solid ${isDark ? 'rgba(255, 255, 255, 0.07)' : 'rgba(124, 58, 237, 0.08)'}`,
         boxShadow: isDark
-          ? '0 4px 20px rgba(0, 0, 0, 0.4)'
-          : '0 4px 12px rgba(109, 40, 217, 0.06), 0 1px 3px rgba(0, 0, 0, 0.04)',
-        minHeight: 120,
+          ? '0 2px 10px rgba(0, 0, 0, 0.35)'
+          : '0 2px 8px rgba(109, 40, 217, 0.04)',
+        minHeight: 68,
       }}
     >
-      <div>
-        {/* Top Header: Label & Icon Badge */}
-        <div className="flex items-center justify-between gap-2 mb-2">
-          <span
-            className="text-[10px] font-bold uppercase tracking-[0.9px]"
-            style={{ color: isDark ? D.textMuted : '#64748B' }}
-          >
-            {label}
-          </span>
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0"
-            style={{
-              color: accent,
-              background: `${accent}1a`,
-              border: `1px solid ${accent}2e`,
-            }}
-          >
-            <Icon size={14} strokeWidth={2} />
-          </div>
-        </div>
-
-        {/* Large Stat Number */}
-        <div
-          className="text-3xl font-extrabold tracking-tight leading-none"
-          style={{ color: accent }}
-        >
-          {prefix}
-          {value}
-          {suffix}
-        </div>
+      {/* Icon Badge */}
+      <div
+        className="w-5 h-5 rounded-md flex items-center justify-center shrink-0"
+        style={{
+          color: accent,
+          background: `${accent}18`,
+          border: `1px solid ${accent}26`,
+        }}
+      >
+        <Icon size={11} strokeWidth={2.2} />
       </div>
 
-      {/* Sub Elements: Progress bar, Sparkline, or Action button */}
-      <div className="mt-2">
-        {sub}
-        {sparkline && (
-          <svg
-            viewBox="0 0 90 24"
-            preserveAspectRatio="none"
-            className="w-full h-5 mt-1"
-          >
-            <polyline
-              points="0,20 12,16 22,18 34,9 46,13 58,5 70,7 80,3 90,2"
-              fill="none"
-              stroke={accent}
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        )}
+      {/* Large Stat Number */}
+      <div
+        className="text-[13.5px] font-bold tracking-tight leading-tight mt-1"
+        style={{ color: accent }}
+      >
+        {prefix}
+        {value}
+        {suffix}
       </div>
+
+      {/* Compact Label */}
+      <span
+        className="text-[8px] font-semibold uppercase tracking-wider mt-0.5 truncate max-w-full"
+        style={{ color: isDark ? D.textMuted : '#64748B' }}
+      >
+        {label}
+      </span>
     </motion.div>
   );
 };
@@ -165,12 +144,12 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigateHistory }) => {
   }, {} as Record<string, number>);
 
   return (
-    <div className="p-5 space-y-6">
-      {/* ── 4 KPI Stats Grid (Directly matching Prompt_Enhancer-FE) ── */}
-      <div className="grid grid-cols-2 gap-3">
+    <div className="p-3.5 space-y-4">
+      {/* ── 4 KPI Stats in One Single Aesthetic Line (grid-cols-4) ── */}
+      <div className="grid grid-cols-4 gap-1.5">
         {/* 1. Total Prompts */}
         <StatCard
-          label="Total Prompts"
+          label="Prompts"
           value={totalPrompts}
           icon={Sparkles}
           accent="#8B5CF6"
@@ -183,22 +162,6 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigateHistory }) => {
           suffix="%"
           icon={TrendingUp}
           accent="#10B981"
-          sub={
-            <div
-              className="h-1 rounded-full overflow-hidden"
-              style={{
-                background: isDark ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)',
-              }}
-            >
-              <div
-                className="h-full rounded-full transition-all duration-1000"
-                style={{
-                  width: `${Math.min(100, Math.max(0, avgScore))}%`,
-                  background: '#10B981',
-                }}
-              />
-            </div>
-          }
         />
 
         {/* 3. This Week */}
@@ -208,7 +171,6 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigateHistory }) => {
           prefix="+"
           icon={Zap}
           accent="#38BDF8"
-          sparkline
         />
 
         {/* 4. Favorites */}
@@ -217,15 +179,7 @@ export const Analytics: React.FC<AnalyticsProps> = ({ onNavigateHistory }) => {
           value={favoritesCount}
           icon={Star}
           accent="#F59E0B"
-          sub={
-            <button
-              onClick={onNavigateHistory}
-              className="text-[11px] font-semibold transition-all hover:underline flex items-center gap-0.5 cursor-pointer"
-              style={{ color: isDark ? '#C084FC' : '#7C3AED' }}
-            >
-              View all →
-            </button>
-          }
+          onClick={onNavigateHistory}
         />
       </div>
 

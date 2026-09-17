@@ -3,7 +3,7 @@
 // Type-safe inter-context messaging for Chrome extension
 // ──────────────────────────────────────────────────────────────
 
-import type { EnhancementMode, EnhanceResult, CategoryClassification } from './enhancement';
+import type { EnhancementMode, EnhancementLevel, EnhanceResult, CategoryClassification } from './enhancement';
 import type { PromptHistoryFilters, PromptHistoryResult, PromptVersion } from './prompt';
 import type { ExtensionSettings } from './settings';
 
@@ -14,11 +14,23 @@ import type { ExtensionSettings } from './settings';
 export interface MessageMap {
   // Enhancement
   ENHANCE_PROMPT: {
-    payload: { prompt: string; mode: EnhancementMode; role?: string; platform: string };
+    payload: {
+      prompt: string;
+      mode: EnhancementMode;
+      role?: string;
+      platform: string;
+      enhancementLevel?: EnhancementLevel;
+    };
     response: EnhanceResult;
   };
   REENHANCE_PROMPT: {
-    payload: { promptId: string; prompt?: string; mode?: EnhancementMode; platform?: string };
+    payload: {
+      promptId: string;
+      prompt?: string;
+      mode?: EnhancementMode;
+      platform?: string;
+      enhancementLevel?: EnhancementLevel;
+    };
     response: EnhanceResult;
   };
   CANCEL_ENHANCE: {

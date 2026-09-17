@@ -169,13 +169,13 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
       >
         <div className="flex items-center gap-2">
           <h3
-            className="text-[13px] font-bold"
+            className="text-[12px] font-semibold"
             style={{ color: isDark ? D.textPrimary : '#1E293B' }}
           >
             Drafts & Versions
           </h3>
           <span
-            className="text-[11px] font-semibold px-2 py-0.5 rounded-full"
+            className="text-[10px] font-medium px-2 py-0.5 rounded-full"
             style={{
               background: isDark ? 'rgba(139, 92, 246, 0.18)' : '#EDE9FE',
               color: isDark ? '#C084FC' : '#7C3AED',
@@ -187,7 +187,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
 
         {versions.length > 1 && (
           <span
-            className="text-[11px] font-medium"
+            className="text-[10.5px] font-medium"
             style={{ color: isDark ? D.textMuted : '#94A3B8' }}
           >
             {selectedVersionId === 'all'
@@ -212,7 +212,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
               <button
                 key={v.id}
                 onClick={() => setSelectedVersionId(v.id)}
-                className="flex-1 min-w-[56px] py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                className="flex-1 min-w-[56px] py-1 px-2 rounded-lg text-[11px] font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                 style={{
                   background: isSelected
                     ? isDark
@@ -254,7 +254,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
 
           <button
             onClick={() => setSelectedVersionId('all')}
-            className="flex-1 min-w-[44px] py-1.5 px-2 rounded-lg text-xs font-semibold transition-all flex items-center justify-center cursor-pointer whitespace-nowrap"
+            className="flex-1 min-w-[44px] py-1 px-2 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center cursor-pointer whitespace-nowrap"
             style={{
               background:
                 selectedVersionId === 'all'
@@ -298,7 +298,7 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04 }}
-              className="rounded-2xl transition-all overflow-hidden flex flex-col"
+              className="rounded-xl transition-all overflow-hidden flex flex-col"
               style={{
                 background: isDark ? D.surfaceElevated : '#FFFFFF',
                 border: `1px solid ${
@@ -311,34 +311,33 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                   : '0 2px 10px rgba(109, 40, 217, 0.04)',
               }}
             >
-              {/* 1. TOP: All 4 items in one line */}
+              {/* 1. TOP: Version header with V1 badge & action button */}
               <div
-                className="flex items-center justify-between gap-2 px-3.5 py-2.5 border-b"
+                className="flex items-center justify-between gap-2 px-3 py-2 border-b"
                 style={{ borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.06)' }}
               >
                 <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {/* Distinct Solid V1/V2 Badge */}
                   <span
-                    className="px-2 py-0.5 text-[11px] font-extrabold rounded-md flex-shrink-0"
+                    className="px-2 py-0.5 text-[10px] font-bold font-mono rounded-md flex-shrink-0 tracking-wide text-white"
                     style={{
-                      background:
-                        version.source === 'enhanced'
-                          ? 'linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)'
-                          : isDark ? 'rgba(255, 255, 255, 0.1)' : '#E2E8F0',
-                      color: '#FFFFFF',
+                      background: version.source === 'enhanced' ? '#7C3AED' : isDark ? '#334155' : '#64748B',
+                      boxShadow: version.source === 'enhanced' ? '0 1px 4px rgba(124, 58, 237, 0.35)' : 'none',
                     }}
                   >
                     V{version.version}
                   </span>
 
+                  {/* Distinct Outlined Source Tag with Micro Icon */}
                   <span
-                    className="px-2 py-0.5 text-[10.5px] font-semibold rounded-full capitalize flex-shrink-0"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 text-[9.5px] font-medium rounded-full capitalize flex-shrink-0"
                     style={{
                       backgroundColor:
                         version.source === 'enhanced'
-                          ? isDark ? 'rgba(139, 92, 246, 0.18)' : '#EDE9FE'
+                          ? isDark ? 'rgba(139, 92, 246, 0.12)' : '#EDE9FE'
                           : version.source === 'edited'
-                          ? isDark ? 'rgba(245, 158, 11, 0.18)' : '#FEF3C7'
-                          : isDark ? 'rgba(255, 255, 255, 0.08)' : '#F1F5F9',
+                          ? isDark ? 'rgba(245, 158, 11, 0.12)' : '#FEF3C7'
+                          : isDark ? 'rgba(255, 255, 255, 0.06)' : '#F1F5F9',
                       color:
                         version.source === 'enhanced'
                           ? isDark ? '#C084FC' : '#7C3AED'
@@ -347,32 +346,36 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                           : isDark ? D.textMuted : '#64748B',
                       border: `1px solid ${
                         version.source === 'enhanced'
-                          ? isDark ? 'rgba(139, 92, 246, 0.35)' : 'rgba(167, 139, 250, 0.5)'
-                          : isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(226, 232, 240, 0.8)'
+                          ? isDark ? 'rgba(139, 92, 246, 0.3)' : 'rgba(167, 139, 250, 0.4)'
+                          : version.source === 'edited'
+                          ? isDark ? 'rgba(245, 158, 11, 0.3)' : 'rgba(245, 158, 11, 0.3)'
+                          : isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(226, 232, 240, 0.8)'
                       }`,
                     }}
                   >
-                    {version.source}
+                    {version.source === 'enhanced' && <RoleIcon name="Sparkles" size={10} strokeWidth={2.2} />}
+                    {version.source === 'edited' && <RoleIcon name="Edit3" size={10} strokeWidth={2.2} />}
+                    <span>{version.source}</span>
                   </span>
                 </div>
 
-                {/* Action Buttons */}
+                {/* Action Buttons: Solid Color (No Gradient) */}
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     onClick={(e) => handleAutoFill(e, version.text, version.id)}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold text-white transition-all shadow-sm active:scale-95 cursor-pointer whitespace-nowrap"
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-md text-[10.5px] font-semibold text-white transition-all shadow-xs active:scale-95 cursor-pointer whitespace-nowrap hover:opacity-90"
                     style={{
-                      background: 'linear-gradient(135deg, #7C3AED 0%, #6366F1 100%)',
+                      background: '#7C3AED',
                     }}
                     title="Auto-fill in active AI Chat Input"
                   >
-                    <RoleIcon name={isFilled ? 'Check' : 'ArrowUpRight'} size={12} strokeWidth={2.5} />
+                    <RoleIcon name={isFilled ? 'Check' : 'ArrowUpRight'} size={11} strokeWidth={2.5} />
                     <span>{isFilled ? 'Filled!' : 'Fill Input'}</span>
                   </button>
 
                   <button
                     onClick={(e) => handleCopy(e, version.text, version.id)}
-                    className="p-1 rounded-lg transition-all cursor-pointer flex items-center justify-center flex-shrink-0"
+                    className="p-1 rounded-md transition-all cursor-pointer flex items-center justify-center flex-shrink-0 hover:opacity-80"
                     style={{
                       color: isCopied ? '#10B981' : isDark ? D.textMuted : '#64748B',
                       background: isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.04)',
@@ -380,21 +383,21 @@ export const VersionTimeline: React.FC<VersionTimelineProps> = ({ promptId, anal
                     }}
                     title="Copy Prompt"
                   >
-                    <RoleIcon name={isCopied ? 'Check' : 'Copy'} size={13} />
+                    <RoleIcon name={isCopied ? 'Check' : 'Copy'} size={12} />
                   </button>
                 </div>
               </div>
 
               {/* 2. MIDDLE: Enhanced prompt formatted with Section Badges, bullets & clean code blocks */}
               <div
-                className="overflow-y-auto px-3.5 py-3 text-[11.5px] leading-relaxed select-text transition-colors scrollbar-thin font-sans"
+                className="overflow-y-auto px-3.5 py-3 text-[11px] leading-relaxed select-text transition-colors scrollbar-thin font-sans"
                 style={{
                   color: isDark ? '#E2E8F0' : '#1E293B',
                   minHeight: 140,
                   maxHeight: 340,
                 }}
               >
-                <FormattedPromptViewer content={version.text} fontSize={11.5} />
+                <FormattedPromptViewer content={version.text} fontSize={11} />
               </div>
 
               {/* 3. BOTTOM: Integrated Score Strip & Dimension Breakdown */}

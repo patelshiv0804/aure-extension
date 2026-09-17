@@ -232,6 +232,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
 
       // Mark as enhancing immediately (synchronous lock before any await)
       isEnhancingRef.current = true;
+      setComparisonContext(null);
       setFlowState('enhancing');
       useEnhanceStore.getState().setStreamingText('');
       useEnhanceStore.getState().setStreamProgress(0);
@@ -242,6 +243,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
       if (roleMode) useEnhanceStore.getState().setSelectedRoleMode(roleMode);
 
       try {
+        const level = useEnhanceStore.getState().enhancementLevel;
         // Parallel: enhance + recommend
         const [result, recommendation] = await Promise.allSettled([
           sendMessage('ENHANCE_PROMPT', {
@@ -249,6 +251,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
             mode,
             role: role ?? mode,
             platform: adapter.getPlatformName(),
+            enhancementLevel: level,
           }),
           sendMessage('RECOMMEND_MODEL', {
             prompt,
@@ -409,6 +412,11 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const [activeVersionNumber, setActiveVersionNumber] = useState<number>(1);
   const [isReenhancing, setIsReenhancing] = useState(false);
   const isReenhancingRef = useRef(false);
+  const [comparisonContext, setComparisonContext] = useState<{
+    basePrompt: string;
+    baseLabel: string;
+    targetLabel: string;
+  } | null>(null);
 
   const handleSelectVersion = useCallback(
     async (verNum: number) => {
@@ -425,55 +433,90 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   );
 
   const handleReenhance = useCallback(async () => {
-    if (isReenhancingRef.current) return;
+    if (isReenhancingRef.current || useEnhanceStore.getState().flowState === 'enhancing') return;
     isReenhancingRef.current = true;
     setIsReenhancing(true);
 
     try {
       const promptId = enhanceResult?.promptId;
-      const currentPromptText = adapterRef.current.extractPrompt() || enhanceResult?.enhancedPrompt || '';
+
+      // ── CRITICAL: Take the EXISTING version prompt, NOT the original prompt ──
+      // Look up currently active version from history first, then editor, then store
+      const activeVersion = versionHistory.find((v) => v.versionNumber === activeVersionNumber);
+      const existingVersionText =
+        activeVersion?.text ||
+        adapterRef.current.extractPrompt() ||
+        enhanceResult?.enhancedPrompt ||
+        '';
+
+      if (!existingVersionText.trim()) {
+        useEnhanceStore.getState().setError('No prompt content found to re-enhance.');
+        setFlowState('error');
+        return;
+      }
+
+      const currentVerNum = activeVersionNumber > 0 ? activeVersionNumber : (versionHistory.length > 1 ? versionHistory.length - 1 : 1);
+      const nextVerNum = currentVerNum + 1;
+
+      // Set comparison context so ComparisonPanel displays the existing version on the left
+      setComparisonContext({
+        basePrompt: existingVersionText,
+        baseLabel: `Existing (v${currentVerNum})`,
+        targetLabel: `Optimized · v${nextVerNum}`,
+      });
+
       const mode = useEnhanceStore.getState().selectedMode || enhanceResult?.mode || 'general';
 
+      // Open the side-by-side ComparisonPanel immediately with live streaming
+      useEnhanceStore.getState().setStreamingText('');
+      useEnhanceStore.getState().setStreamProgress(0);
+      useEnhanceStore.getState().setError(null);
+      setCurrentPrompt(existingVersionText);
+      setFlowState('enhancing');
+
+      const level = useEnhanceStore.getState().enhancementLevel;
       const result: EnhanceResult = await sendMessage('REENHANCE_PROMPT', {
         promptId: promptId || '',
-        prompt: currentPromptText,
+        prompt: existingVersionText,
         mode,
         platform: adapter.getPlatformName(),
+        enhancementLevel: level,
       });
 
       if (result && result.enhancedPrompt) {
+        // Ensure result.originalPrompt reflects the existing version that was re-enhanced
+        result.originalPrompt = existingVersionText;
         setEnhanceResult(result);
-        const cleanText = formatPromptText(result.enhancedPrompt);
-        await adapterRef.current.injectPrompt(cleanText);
-        setIsUndone(false);
-        setFlowState('injected');
+        // Transition to comparing: keeps the side-by-side window open with the final result,
+        // diffs, dimension scores, and the "Insert into Chat" button!
+        setFlowState('comparing');
+        useEnhanceStore.getState().setShowRecommendation(true);
 
         // Automatically broadcast history update on successful re-enhancement
         try {
           chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: result.promptId || promptId } }).catch(() => {});
           chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
         } catch {}
-
-        setVersionHistory((prev) => {
-          const nextNum = prev.length;
-          setActiveVersionNumber(nextNum);
-          return [
-            ...prev,
-            {
-              versionNumber: nextNum,
-              text: cleanText,
-              label: `v${nextNum}-enhanced`,
-            },
-          ];
-        });
+      } else {
+        throw new Error('Re-enhancement returned empty result');
       }
     } catch (err) {
       console.error('[AURE] Failed to re-enhance prompt:', err);
+      const store = useEnhanceStore.getState();
+      if (store.streamingText) {
+        setFlowState('comparing');
+      } else if (versionHistory.length > 0) {
+        setComparisonContext(null);
+        setFlowState('injected');
+      } else {
+        setComparisonContext(null);
+        setFlowState('error');
+      }
     } finally {
       isReenhancingRef.current = false;
       setIsReenhancing(false);
     }
-  }, [enhanceResult, adapter, setEnhanceResult, setIsUndone, setFlowState]);
+  }, [enhanceResult, adapter, setEnhanceResult, setFlowState, versionHistory, activeVersionNumber, setCurrentPrompt]);
 
   const handleUndo = useCallback(async () => {
     handleSelectVersion(0);
@@ -495,9 +538,49 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
   const handleInjectPrompt = useCallback(
     async (text: string) => {
       try {
-        await adapterRef.current.injectPrompt(formatPromptText(text));
+        const cleanText = formatPromptText(text);
+        await adapterRef.current.injectPrompt(cleanText);
         setIsUndone(false);
+        setComparisonContext(null);
         setFlowState('injected');
+
+        // Update or append to version history
+        setVersionHistory((prev) => {
+          if (prev.length === 0) {
+            const orig = useEnhanceStore.getState().enhanceResult?.originalPrompt || useEnhanceStore.getState().currentPrompt || '';
+            setActiveVersionNumber(1);
+            return [
+              { versionNumber: 0, text: orig, label: 'Original' },
+              { versionNumber: 1, text: cleanText, label: 'v1-enhanced' },
+            ];
+          }
+
+          // Check if this text is already the active version
+          const existing = prev.find((v) => v.text === cleanText);
+          if (existing) {
+            setActiveVersionNumber(existing.versionNumber);
+            return prev;
+          }
+
+          const backendVerNum = useEnhanceStore.getState().enhanceResult?.versionNumber;
+          const nextNum = backendVerNum && backendVerNum > 0 ? backendVerNum : prev.length;
+          setActiveVersionNumber(nextNum);
+          return [
+            ...prev,
+            {
+              versionNumber: nextNum,
+              text: cleanText,
+              label: `v${nextNum}-enhanced`,
+            },
+          ];
+        });
+
+        // Broadcast history update on prompt insertion
+        try {
+          const currentPromptId = useEnhanceStore.getState().enhanceResult?.promptId;
+          chrome.runtime.sendMessage({ type: 'HISTORY_UPDATED', payload: { promptId: currentPromptId } }).catch(() => {});
+          chrome.storage.local.set({ last_history_update: Date.now() }).catch(() => {});
+        } catch {}
       } catch (error) {
         console.error('[AURE] Injection failed:', error);
         useEnhanceStore.getState().setError('Failed to inject prompt');
@@ -524,7 +607,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
       )}
 
       {/* In-Place Enhanced Badge (Version Dropdown / Undo / Re-enhance / Save) */}
-      {(flowState === 'injected' || flowState === 'comparing') && enhanceResult && (
+      {flowState === 'injected' && enhanceResult && (
         <EnhancedBadge
           adapter={adapter}
           isUndone={isUndone}
@@ -537,6 +620,7 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
           onSelectVersion={handleSelectVersion}
           onDismiss={() => {
             setVersionHistory([]);
+            setComparisonContext(null);
             reset();
           }}
         />
@@ -549,10 +633,18 @@ export const ContentRoot: React.FC<ContentRootProps> = ({ adapter }) => {
             adapter={adapter}
             onAccept={handleInjectPrompt}
             onReject={() => {
-              // Since we no longer auto-inject, 'Close' just resets to idle.
-              // The prompt in the textarea is still the original — user chose not to insert.
-              reset();
+              sendMessage('CANCEL_ENHANCE', { promptId: enhanceResult?.promptId }).catch(() => {});
+              setComparisonContext(null);
+              if (versionHistory.length > 0) {
+                setFlowState('injected');
+              } else {
+                setVersionHistory([]);
+                reset();
+              }
             }}
+            basePrompt={comparisonContext?.basePrompt}
+            baseLabel={comparisonContext?.baseLabel}
+            targetLabel={comparisonContext?.targetLabel}
           />
         </ErrorBoundary>
       )}

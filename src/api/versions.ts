@@ -72,38 +72,10 @@ export async function getVersions(promptId: string): Promise<PromptVersion[]> {
       }));
     }
   } catch (error) {
-    console.warn('[AURE] API versions fetch fallback to dummy data:', error);
+    console.warn('[AURE] API versions fetch failed or empty for prompt:', promptId, error);
   }
 
-  // Fallback to dummy version history for UI testing
-  return [
-    {
-      id: `${promptId}-v1`,
-      promptId,
-      version: 1,
-      text: 'Act as a creative content strategist with expertise in crafting engaging content.',
-      source: 'user',
-      createdAt: Date.now() - 1000 * 60 * 45,
-    },
-    {
-      id: `${promptId}-v2`,
-      promptId,
-      version: 2,
-      text: 'Act as a Senior Creative Content Strategist. Formulate a 30-day content calendar for an AI SaaS product launch. Include buyer personas, content formats, and KPIs.',
-      source: 'enhanced',
-      mode: 'creator',
-      createdAt: Date.now() - 1000 * 60 * 35,
-    },
-    {
-      id: `${promptId}-v3`,
-      promptId,
-      version: 3,
-      text: 'Act as a Senior Creative Content Strategist. Your objective is to formulate a comprehensive 30-day content calendar for an AI SaaS product launch. Include target buyer personas, key messaging pillars, content formats (blog, LinkedIn, video), and KPIs to track engagement.',
-      source: 'edited',
-      mode: 'creator',
-      createdAt: Date.now() - 1000 * 60 * 30,
-    },
-  ];
+  return [];
 }
 
 function normalizeVersionSource(source?: string): 'user' | 'enhanced' | 'edited' {
